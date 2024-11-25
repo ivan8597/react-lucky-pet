@@ -1,17 +1,17 @@
 {
   "files": {
     "main.css": "/react-lucky-pet/static/css/main.2605203d.css",
-    "main.js": "/react-lucky-pet/static/js/main.aa0b70a3.js",
+    "main.js": "/react-lucky-pet/static/js/main.ce747a9f.js",
     "static/media/Rain.mp3": "/react-lucky-pet/static/media/Rain.31b61583dc4285aeeea5.mp3",
     "static/media/img9.jpg": "/react-lucky-pet/static/media/img9.a5559ef3769c3e7ec5fe.jpg",
     "static/media/p9.mp3": "/react-lucky-pet/static/media/p9.38ea05a6275c867286a4.mp3",
     "static/media/hit.mp3": "/react-lucky-pet/static/media/hit.d9a25a72dafd555f5187.mp3",
     "index.html": "/react-lucky-pet/index.html",
     "main.2605203d.css.map": "/react-lucky-pet/static/css/main.2605203d.css.map",
-    "main.aa0b70a3.js.map": "/react-lucky-pet/static/js/main.aa0b70a3.js.map"
+    "main.ce747a9f.js.map": "/react-lucky-pet/static/js/main.ce747a9f.js.map"
   },
   "entrypoints": [
     "static/css/main.2605203d.css",
-    "static/js/main.aa0b70a3.js"
+    "static/js/main.ce747a9f.js"
   ]
 }
