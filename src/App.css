@@ -1,38 +1,179 @@
-.App {
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: rgb(37, 119, 151);
+}
+
+.wrapper {
+  position: relative;
+  height: 919px;
+}
+
+
+.mountains {
+  position: absolute;
+  height: 919px;
+  border: 1px solid yellow;
+}
+
+
+
+.list {
+  width: 199px;
+  height: 19px;
+  border-radius: 9px;
+  background-color: white;
+  text-align: center;
+  position: absolute;
+  top: 899px;
+  left: 79px;
+}
+.climber {
+  position: absolute;
+  width: 49px;
+  height: 49px;
+  bottom: 19px;
+  left: 29px;
+  z-index: 999;
+}
+
+.active{
+  background-color: rgb(141, 29, 29);
+
+
+}
+.line{
+  width: 99px;
+  border-radius: 9px;
+
+  position: absolute;
+  bottom: 199px;
+  left: 429px;
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.colnse {
+  position: absolute;
+  width: 99px;
+  height: 99px;
+  background-color: orange;
+  border-radius: 50px;
+  left: 499px;
+  top: 19px;
+  filter: brightness(190%);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.bird{
+  position: absolute;
+  width: 49px;
+  height: 49px;
+  bottom: 19px;
+  left: 29px;;}
+
+.youWin {
+  text-align: center;
+  font-size: 99px;
+  color: aquamarine;
+  position: relative;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+
+.start-page {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
+  height: 100vh;
+  background-image: url('../public//img/img9.jpg'); 
+  background-size: cover; 
+  background-position: center; 
+  position: relative;
+  color: white; 
+}
+
+.start-page img {
+  display: none; 
+}
+
+.start-page button {
+  padding: 10px 20px;
+  font-size: 1rem;
+  background-color: #4caf50;
   color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
 }
 
-.App-link {
-  color: #61dafb;
+.start-page button:hover {
+  background-color: #45a049;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
+@keyframes fadeIn {
   to {
-    transform: rotate(360deg);
+    opacity: 1; 
   }
+}
+
+.snow-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Игнорируем события мыши */
+}
+
+.snowflake {
+  position: absolute;
+  top: -10%; /* Начинаем чуть выше экрана */
+  color: white; /* Цвет снежинок */
+  font-size: 24px; /* Размер снежинок */
+  animation: fall linear infinite; /* Анимация падения */
+}
+
+/* Анимация падения снега */
+@keyframes fall {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(calc(100vw - 50px)) translateY(100vh);
+    opacity: 0; /* Снежинка исчезает при падении */
+  }
+}
+.snowflake:nth-child(1) {
+  left: 10%;
+  animation-duration: 3s;
+}
+
+.snowflake:nth-child(2) {
+  left: 30%;
+  animation-duration: 4s;
+}
+
+.snowflake:nth-child(3) {
+  left: 50%;
+  animation-duration: 5s;
+}
+
+.snowflake:nth-child(4) {
+  left: 70%;
+  animation-duration: 3.5s;
+}
+
+.snowflake:nth-child(5) {
+  left: 90%;
+  animation-duration: 4.5s;
+}
+
+.snowflake:nth-child(6) {
+  left: 20%;
+  animation-duration: 6s;
 }
