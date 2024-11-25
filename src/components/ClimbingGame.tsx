@@ -299,7 +299,7 @@ const ClimbingGame: React.FC = () => {
               </div>
             ))}
           </div>
-          <img className="mountains" src="/img/mountains.png" alt="mountains" />
+          <img className="mountains" src="./img/mountains.png" alt="mountains" />
           <div className="list">z вперед, x назад</div>
           <div className="colnse"></div>
 
@@ -357,7 +357,7 @@ const ClimbingGame: React.FC = () => {
           )}
           <img
             className="climber"
-            src="/img/climber.png"
+            src="./img/climber.png"
             alt="climber"
             style={climberStyle}
           />
