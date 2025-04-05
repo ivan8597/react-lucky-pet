@@ -1,0 +1,61 @@
+.falling-rock {
+  width: 50px;
+  height: 50px;
+  position: absolute;
+  background: linear-gradient(135deg, #8B4513, #654321);
+  clip-path: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%);
+  box-shadow: inset -2px -2px 10px rgba(0, 0, 0, 0.3);
+  animation: rock-rotation 2s infinite linear;
+}
+
+.falling-rock::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  background: linear-gradient(135deg, #A0522D, #8B4513);
+  clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+}
+
+.falling-rock::after {
+  content: '💎';
+  position: absolute;
+  font-size: 20px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.7;
+}
+
+@keyframes rock-rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.falling-rock.small {
+  transform: scale(0.8);
+}
+
+.falling-rock.medium {
+  transform: scale(1);
+}
+
+.falling-rock.large {
+  transform: scale(1.2);
+}
+
+.rock-shadow {
+  position: absolute;
+  width: 40px;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  filter: blur(3px);
+  transform: translateY(25px);
+} 

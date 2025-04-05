@@ -1,34 +1,42 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import gameMusic from "./audio/Rain.mp3";
 import hitSound from "./audio/hit.mp3";
 import victorySound from "./audio/p9.mp3";
+import "../styles/Birds.css";
+import "../styles/Climber.css";
+import "../styles/Rocks.css";
+import "../styles/Sun.css";
+import "../styles/Obstacles.css";
+import "../styles/StartPage.css";
+
 enum Stage {
   START = "start",
   GAME = "game",
   FINISH = "finish",
 }
-const ClimbingGame: React.FC = () => {
-  const [currentLineIndex, setCurrentLineIndex] = useState<number>(0); // Индекс текущей видимой линии
-  const [fallingRocks, setFallingRocks] = useState<number[]>([]); // Список падающих камней
-  const [score, setScore] = useState<number>(0);
-  const [topValues, setTopValues] = useState<number[]>([100, 0, 200, 0, 0]); // Список вертикальных позиций камней
-  const [IsThirdLineVisible, setIsThirdLineVisible] = useState<boolean>(false);
-  const [isSecondLineVisible, setIsSecondLineVisible] =
-    useState<boolean>(false);
-  const [isFirstLineVisible, setIsFirstLineVisible] = useState<boolean>(false);
-  // const [isFinished, setIsFinished] = useState<boolean>(false);
-  const lineStep: number = 129; // Расстояние между линиями
-  const [isGameStarted, setIsGameStarted] = useState<boolean>(false);
-  const [savedScores, setSavedScores] = useState<number>(0);
-  const [stage, setStage] = useState<Stage>(Stage.START);
-  const [isFinalScore, setIsFinalScore] = useState<number>(0);
-  const [time, setTime] = useState<number>(49);
 
+const ClimbingGame: React.FC = () => {
+  const lineStep: number = 129;
+
+  const [stage, setStage] = useState<Stage>(Stage.START);
+  const [currentLineIndex, setCurrentLineIndex] = useState<number>(0);
+  const [fallingRocks, setFallingRocks] = useState<number[]>([]);
+  const [score, setScore] = useState<number>(0);
+  const [topValues, setTopValues] = useState<number[]>([100, 0, 200, 0, 0]);
+  const [isThirdLineVisible, setIsThirdLineVisible] = useState<boolean>(false);
+  const [isSecondLineVisible, setIsSecondLineVisible] = useState<boolean>(false);
+  const [isFirstLineVisible, setIsFirstLineVisible] = useState<boolean>(false);
   const [lives, setLives] = useState<number>(3);
+  const [time, setTime] = useState<number>(49);
+  const [isMoving, setIsMoving] = useState<boolean>(false);
+  const [savedScores, setSavedScores] = useState<number>(0);
+  const [isFinalScore, setIsFinalScore] = useState<number>(0);
+  const [rockSizes, setRockSizes] = useState<string[]>([]);
 
   const audioRef = React.createRef<HTMLAudioElement>();
   const hitAudioRef = React.createRef<HTMLAudioElement>();
   const victoryAudioRef = React.createRef<HTMLAudioElement>();
+
   const playerPosition = useMemo(() => {
     return {
       bottom: (currentLineIndex + 1) * lineStep,
@@ -36,189 +44,147 @@ const ClimbingGame: React.FC = () => {
     };
   }, [currentLineIndex]);
 
-  ////////////////////////////////
-
-  const resetGame = () => {
+  const startGame = useCallback(() => {
+    setStage(Stage.GAME);
     setCurrentLineIndex(0);
     setFallingRocks([]);
-    setTopValues([100, 0, 200, 0, 0]);
-    // setIsFinished(false);
-    setStage(Stage.START);
     setScore(0);
-    setIsGameStarted(false);
-    setIsFinalScore(0);
-    setTime(49);
-    setLives(3);
+    setTopValues([100, 0, 200, 0, 0]);
     setIsThirdLineVisible(false);
     setIsSecondLineVisible(false);
     setIsFirstLineVisible(false);
+    setLives(3);
+    setTime(49);
+    setIsFinalScore(0);
+    setRockSizes([]);
+  }, []);
+
+  const handleStartClick = () => {
+    startGame();
+    audioRef.current?.play().catch(() => {
+      console.log('Музыка будет воспроизведена при следующем взаимодействии');
+    });
   };
 
-  const handleStart = () => {
-    resetGame();
-    setIsGameStarted(true);
-    setTimeout(() => {
-      setStage(Stage.GAME);
-    }, 300);
-    // setTime(49);
-  };
+  const resetGame = useCallback(() => {
+    setStage(Stage.START);
+    setCurrentLineIndex(0);
+    setFallingRocks([]);
+    setScore(0);
+    setTopValues([100, 0, 200, 0, 0]);
+    setIsThirdLineVisible(false);
+    setIsSecondLineVisible(false);
+    setIsFirstLineVisible(false);
+    setLives(3);
+    setTime(49);
+    setIsFinalScore(0);
+    setRockSizes([]);
+  }, []);
+
+  useEffect(() => {
+    if (stage === Stage.GAME) {
+      requestAnimationFrame(() => {
+        const wrapper = document.querySelector('.wrapper') as HTMLElement;
+        if (wrapper) {
+          wrapper.focus();
+        }
+      });
+    }
+  }, [stage, currentLineIndex, lives, time]);
 
   const checkPlayerCollisionWithRock = () => {
-    // Проверяем столкновение игрока с камнями
+    if (stage !== Stage.GAME) return;
+
     fallingRocks.forEach((rockIndex) => {
       const rockPosition = topValues[rockIndex];
-
       const distanceY = Math.abs(
         rockPosition - (window.innerHeight - playerPosition.bottom)
       );
       const distanceX = Math.abs(400 + rockIndex * 190 - playerPosition.left);
+      
       if (distanceY <= 29 && distanceX <= 29) {
         hitAudioRef.current?.play();
-
-        setLives((prevLives) => {
-          if (prevLives === 0) {
-            resetGame();
-            audioRef.current?.pause();
-            return 0;
-          }
-
-          return prevLives - 1; // Уменьшаем количество жизней
-        });
-
-        setCurrentLineIndex(0); // Возвращаем игрока в начало
-
-        setTopValues(
-          // Обновляем вертикальные позиции камней
-          topValues.map((topValue, index) => {
-            if (rockIndex === index) {
-              return 0;
-            } else {
-              return topValue;
-            }
-          })
-        );
+        setLives(lives - 1);
+        setCurrentLineIndex(0);
+        setTopValues(topValues.map((topValue, index) => 
+          rockIndex === index ? 0 : topValue
+        ));
       }
     });
   };
 
   const fallingRockhjh = () => {
-    // Падение камней
-    setTopValues((topValues) => {
-      const updatedTopValues = topValues.map((value, index) => {
-        if (fallingRocks.includes(index)) {
-          if (window.innerHeight <= value) {
-            return 0;
-          }
-          return value + 29;
-        } else {
+    setTopValues(topValues.map((value, index) => {
+      if (fallingRocks.includes(index)) {
+        if (window.innerHeight <= value) {
+          setScore(prevScore => prevScore + 5);
           return 0;
         }
-      });
-
-      fallingRocks.forEach((rockIndex) => {
-        const rockPosition = updatedTopValues[rockIndex];
-        const distanceY = Math.abs(400 + rockIndex * 190 - playerPosition.left);
-        if (distanceY <= 29 && rockPosition === 0) {
-          setScore((prevscore) => prevscore + 1);
-        }
-      });
-      return updatedTopValues;
-    });
+        return value + 29;
+      } else {
+        return 0;
+      }
+    }));
     checkPlayerCollisionWithRock();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "x" || (event.key === "ч" && currentLineIndex < 4)) {
+    if (stage !== Stage.GAME) {
+      return;
+    }
+
+    if (event.key === "x" || event.key === "ч") {
+      if (currentLineIndex >= 4) {
+        return;
+      }
       if (
-        (currentLineIndex === 2 && IsThirdLineVisible) ||
+        (currentLineIndex === 2 && isThirdLineVisible) ||
         (currentLineIndex === 1 && isSecondLineVisible) ||
         (currentLineIndex === 3 && isFirstLineVisible)
       ) {
         return;
       }
+      setIsMoving(true);
       setCurrentLineIndex(currentLineIndex + 1);
-    } else if (
-      event.key === "z" ||
-      (event.key === "я" && currentLineIndex > 0)
-    ) {
+      setScore(prevScore => prevScore + 10);
+    } else if (event.key === "z" || event.key === "я") {
+      if (currentLineIndex <= 0) {
+        return;
+      }
+      setIsMoving(true);
       setCurrentLineIndex(currentLineIndex - 1);
     }
   };
 
-  const generateRandomRock = () => {
-    // Генерация случайных камней
-    const randomLineIndex = Math.floor(Math.random() * 5);
-    setFallingRocks((fallingRocks) =>
-      fallingRocks.includes(randomLineIndex)
-        ? fallingRocks
-        : [...fallingRocks, randomLineIndex]
-    );
+  const handleKeyUp = () => {
+    setIsMoving(false);
   };
-  ////////////////////////////
-  useEffect(() => {
-    // Сброс игры
 
-    resetGame();
-  }, []);
-
-  // useEffect(() => {
-  //   const saved = localStorage.getItem("score");
-  //   if (saved && stage === Stage.FINISH) {
-  //     setSavedScores(JSON.parse(saved));
-  //   } else if (saved && stage === Stage.GAME) {
-  //     setSavedScores(0);
-  //   }
-  // }, [stage]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("score");
-    if (saved && stage === Stage.FINISH) {
-        let finalSavedScore = JSON.parse(saved);
-        if (lives === 3) {
-            finalSavedScore = Math.floor(finalSavedScore * 3); 
-        }
-        setSavedScores(finalSavedScore); 
-    } else if (saved && stage === Stage.GAME) {
-        setSavedScores(0); 
+  const generateRandomRock = () => {
+    const randomLineIndex = Math.floor(Math.random() * 5);
+    const sizes = ['small', 'medium', 'large'];
+    const randomSize = sizes[Math.floor(Math.random() * sizes.length)];
+    
+    if (!fallingRocks.includes(randomLineIndex)) {
+      setFallingRocks([...fallingRocks, randomLineIndex]);
+      setRockSizes([...rockSizes, randomSize]);
     }
-}, [stage, lives]);
+  };
 
   useEffect(() => {
-    localStorage.setItem("score", JSON.stringify(score));
-  }, [score]);
-  useEffect(() => {
-    //Таймер
-    let timer: NodeJS.Timeout;
-    if (stage === Stage.GAME && time > 0) {
-      timer = setInterval(() => {
-        setTime((prevTime) => prevTime - 1);
-      }, 1000);
-      audioRef.current?.play();
-    } else if (time === 0 || stage === Stage.FINISH) {
-      setStage(Stage.FINISH);
-      audioRef.current?.pause();
-      setTimeout(() => {
-        resetGame();
-      }, 3000);
-    }
-    return () => clearInterval(timer);
-  }, [stage]);
-  useEffect(() => {
-    if (stage === Stage.START) {
-      return;
-    }
-    let interval = setInterval(() => {
-      if (stage === Stage.FINISH) {
-        clearInterval(interval);
-        setFallingRocks([]);
-        return;
-      }
-      generateRandomRock();
-      fallingRockhjh();
-    }, 90); // Измените интервал по необходимости
+    let interval: NodeJS.Timeout;
 
-    return () => clearInterval(interval);
-  }, [generateRandomRock, stage]);
+    if (stage === Stage.GAME) {
+      interval = setInterval(() => {
+        generateRandomRock();
+        fallingRockhjh();
+      }, 90);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [stage, fallingRocks, topValues]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -226,48 +192,97 @@ const ClimbingGame: React.FC = () => {
     if (stage === Stage.GAME) {
       const toggleVisibility = () => {
         if (
-          (!IsThirdLineVisible && currentLineIndex === 2) ||
+          (!isThirdLineVisible && currentLineIndex === 2) ||
           (!isSecondLineVisible && currentLineIndex === 1) ||
           (!isFirstLineVisible && currentLineIndex === 3)
         ) {
           setCurrentLineIndex(0);
         }
-        setIsThirdLineVisible((prev) => !prev); // Переключение видимости
-        setIsSecondLineVisible((prev) => !prev);
-        setIsFirstLineVisible((prev) => !prev);
+        setIsThirdLineVisible(!isThirdLineVisible);
+        setIsSecondLineVisible(!isSecondLineVisible);
+        setIsFirstLineVisible(!isFirstLineVisible);
       };
 
-      interval = setInterval(toggleVisibility, 990); // Каждые 9 секунд переключаем видимость
+      interval = setInterval(toggleVisibility, 990);
 
-      return () => clearInterval(interval); // Очистка интервала при размонтировании или изменении состояния
+      return () => clearInterval(interval);
     }
-  }, [
-    stage,
-    IsThirdLineVisible,
-    isSecondLineVisible,
-    isFirstLineVisible,
-    currentLineIndex,
-  ]);
+  }, [stage, isThirdLineVisible, isSecondLineVisible, isFirstLineVisible, currentLineIndex]);
 
   useEffect(() => {
-    // Проверка окончания игры
+    let timerInterval: NodeJS.Timeout;
+
+    if (stage === Stage.GAME && time > 0) {
+      timerInterval = setInterval(() => {
+        setTime(prevTime => prevTime - 1);
+      }, 1000);
+    }
+
+    if (time === 0 && stage === Stage.GAME) {
+      let finalScore = score; // Сохраняем очки при истечении времени
+      setIsFinalScore(finalScore);
+      if (finalScore > savedScores) {
+        setSavedScores(finalScore);
+      }
+      setStage(Stage.FINISH);
+      audioRef.current?.pause();
+      audioRef.current.currentTime = 0;
+      setTimeout(() => {
+        resetGame();
+      }, 3000);
+    }
+
+    return () => {
+      if (timerInterval) clearInterval(timerInterval);
+    };
+  }, [stage, time, score, savedScores]);
+
+  useEffect(() => {
     if (currentLineIndex === 4) {
       let finalScore = score;
       if (lives === 3) {
         finalScore = Math.floor(finalScore * 3);
       }
       setIsFinalScore(finalScore);
+      if (finalScore > savedScores) {
+        setSavedScores(finalScore);
+      }
       setStage(Stage.FINISH);
       victoryAudioRef.current?.play();
+      audioRef.current?.pause();
+      audioRef.current.currentTime = 0;
+      
+      setTimeout(() => {
+        resetGame();
+      }, 3000);
     }
-  }, [currentLineIndex, score]);
+  }, [currentLineIndex, score, lives, savedScores]);
 
-  ////////////////////////////////////////////////////
-  const climberStyle: React.CSSProperties = {
-    left: `${playerPosition.left}px`,
-    bottom: `${playerPosition.bottom}px`,
-    position: "absolute",
-  };
+  useEffect(() => {
+    if (lives === 0) {
+      setIsFinalScore(0); // Обнуляем очки при потере всех жизней
+      if (0 > savedScores) { // Сравниваем с 0, так как очки обнуляются
+        setSavedScores(0);
+      }
+      setStage(Stage.FINISH);
+      audioRef.current?.pause();
+      audioRef.current.currentTime = 0;
+      setTimeout(() => {
+        resetGame();
+      }, 3000);
+    }
+  }, [lives, savedScores]);
+
+  useEffect(() => {
+    const savedHighScore = localStorage.getItem('highScore');
+    if (savedHighScore) {
+      setSavedScores(parseInt(savedHighScore));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('highScore', savedScores.toString());
+  }, [savedScores]);
 
   return (
     <>
@@ -275,23 +290,48 @@ const ClimbingGame: React.FC = () => {
         ref={hitAudioRef}
         src={hitSound}
         preload="auto"
-        autoPlay={false}
       ></audio>
-      <audio ref={audioRef} src={gameMusic} autoPlay={false} loop />
-      {!isGameStarted ? (
+      <audio 
+        ref={audioRef} 
+        src={gameMusic} 
+        loop 
+      />
+      <audio
+        ref={victoryAudioRef}
+        src={victorySound}
+        preload="auto"
+      ></audio>
+      {stage === Stage.START ? (
         <div className="start-page">
-          <div className="scores">Scores:{savedScores} </div>
-          <button onClick={handleStart}>Start</button>
+          <div className="floating-snowflakes">
+            {Array.from({ length: 15 }).map((_, index) => (
+              <div
+                key={index}
+                className="start-snowflake"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 5}s`
+                }}
+              >
+                ❄️
+              </div>
+            ))}
+          </div>
+          <h1 className="game-title">Восхождение на вершину</h1>
+          <div className="scores">Лучший счет: {savedScores}</div>
+          <button className="start-button" onClick={handleStartClick}>
+            Начать игру
+          </button>
         </div>
       ) : (
-        <div className="wrapper" tabIndex={0} onKeyDown={handleKeyDown}>
-          <audio
-            ref={victoryAudioRef}
-            src={victorySound}
-            preload="auto"
-            autoPlay={false}
-          ></audio>
-
+        <div 
+          className="wrapper" 
+          tabIndex={0} 
+          onKeyDown={handleKeyDown} 
+          onKeyUp={handleKeyUp}
+          autoFocus
+          style={{ outline: 'none' }}
+        >
           <div className="snow-container">
             {Array.from({ length: 19 }).map((_, index) => (
               <div key={index} className="snowflake">
@@ -299,72 +339,99 @@ const ClimbingGame: React.FC = () => {
               </div>
             ))}
           </div>
+          <div className="sun-container">
+            <div className="sun" />
+            {Array.from({ length: 12 }).map((_, index) => (
+              <div
+                key={index}
+                className="sun-ray"
+                style={{
+                  transform: `rotate(${index * 30}deg)`,
+                  animation: `ray-pulse 2s infinite alternate ${index * 0.2}s`
+                }}
+              />
+            ))}
+          </div>
+          <div className="birds-container">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="bird" />
+            ))}
+          </div>
           <img className="mountains" src="/img/mountains.png" alt="mountains" />
+          <div 
+            style={{
+              position: "absolute",
+              left: `${400 + 4 * 190}px`,
+              bottom: `${4 * lineStep + 50}px`,
+              fontSize: "40px",
+              zIndex: 2
+            }}
+          >
+            🚩
+          </div>
           <div className="list">z вперед, x назад</div>
           <div className="colnse"></div>
 
           {fallingRocks.map((rockIndex, index) => (
-            <div
-              key={index}
+            <div key={index} className={`falling-rock ${rockSizes[index] || 'medium'}`}
               style={{
-                position: "absolute",
                 left: `${400 + rockIndex * 190}px`,
                 top: `${topValues[rockIndex]}px`,
-                backgroundColor: "brown",
-                width: "50px",
-                height: "50px",
               }}
             >
-              Камень
+              <div className="rock-shadow" />
             </div>
           ))}
 
-          {!IsThirdLineVisible && (
+          {!isThirdLineVisible && (
             <div
+              className="obstacle"
               style={{
                 left: `${400 + 2 * 190}px`,
                 bottom: `${2 * lineStep}px`,
-                backgroundColor: "yellow",
-                position: "absolute",
               }}
             >
-              Препятствие
+              <div className="obstacle-warning">Опасно</div>
             </div>
           )}
           {!isSecondLineVisible && (
             <div
+              className="obstacle"
               style={{
                 left: `${400 + 1 * 190}px`,
                 bottom: `${1 * lineStep}px`,
-                backgroundColor: "yellow",
-                position: "absolute",
               }}
             >
-              Препятствие
+              <div className="obstacle-warning">Опасно</div>
             </div>
           )}
           {!isFirstLineVisible && (
             <div
+              className="obstacle"
               style={{
                 left: `${400 + 3 * 190}px`,
                 bottom: `${3 * lineStep}px`,
-                backgroundColor: "yellow",
-                position: "absolute",
               }}
             >
-              Препятствие
+              <div className="obstacle-warning">Опасно</div>
             </div>
           )}
-          <img
-            className="climber"
-            src="/img/climber.png"
-            alt="climber"
-            style={climberStyle}
+          <div
+            className={`climber ${isMoving ? 'moving' : ''}`}
+            style={{
+              left: `${playerPosition.left}px`,
+              bottom: `${playerPosition.bottom}px`,
+            }}
           />
 
           {stage === Stage.FINISH && (
             <div className="youWin">
-              Вы победитель! Ваши очки:{isFinalScore}
+              <div>
+                {currentLineIndex === 4 
+                  ? `Вы победитель! Ваши очки: ${isFinalScore}`
+                  : `Игра окончена! Набрано очков: ${isFinalScore}`
+                }
+              </div>
             </div>
           )}
           <div
