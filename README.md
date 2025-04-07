@@ -1,70 +1,107 @@
-# Getting Started with Create React App
+# React Lucky Pet 🐻
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Увлекательное игровое приложение с тремя последовательными уровнями, где милый медвежонок встречает игрока на финише каждого уровня.
 
-## Available Scripts
+## 📋 Описание
 
-In the project directory, you can run:
+React Lucky Pet - это игровое приложение, разработанное на React и TypeScript, предлагающее три разных увлекательных игровых уровня:
 
-### `npm start`
+1. **Восхождение на вершину** - управляйте альпинистом, который должен достичь вершины горы, избегая падающих камней.
+2. **Прыжки по бревнам** - перемещайтесь по бревнам в водной среде, избегая рыб, прыгающих из воды.
+3. **Сбор монет** - собирайте монеты, перепрыгивая между бревнами и избегая пауков.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Каждый уровень уникален и предлагает разные игровые механики, а на финише каждого уровня вас ждет праздничный медвежонок!
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 🎮 Уровни игры
 
-### `npm test`
+### Уровень 1: Восхождение на вершину
+- Поднимитесь на гору, используя клавиши Z и X для перемещения
+- Избегайте падающих камней разных размеров
+- Доберитесь до финишного флага, где вас ждет радостно прыгающий медвежонок
+- Набрав 90+ очков, вы перейдете на второй уровень
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Уровень 2: Прыжки по бревнам
+- Перемещайтесь по бревнам с помощью стрелок ← и → (или клавиш A и D)
+- Избегайте рыб, выпрыгивающих из воды
+- Достигните финиша, где вас встретит медвежонок в подводной маске и трубке
+- При достижении финиша медвежонок радостно прыгает и пускает пузыри из трубки
 
-### `npm run build`
+### Уровень 3: Сбор монет
+- Собирайте монеты, управляя персонажем с помощью стрелок
+- Прыгайте на бревна, чтобы достичь высоко расположенных монет
+- Избегайте пауков, которые могут отнять жизни
+- После сбора всех монет найдите медвежонка с финишным флагом
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 🎮 Управление
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Уровень 1: Восхождение на вершину
+- `Z` - передвижение назад
+- `X` - передвижение вперед
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Уровень 2: Прыжки по бревнам
+- `←` или `A` - прыжок на предыдущее бревно
+- `→` или `D` - прыжок на следующее бревно
 
-### `npm run eject`
+### Уровень 3: Сбор монет
+- `↑` - прыжок
+- `←` - движение влево
+- `→` - движение вправо
+- `↓` - спуск с бревна
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## 🚀 Технические детали
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Проект разработан с использованием:
+- React 18
+- TypeScript
+- CSS для анимаций и стилей
+- Компонентная архитектура для каждого уровня игры
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Особенности реализации:
+- Динамические анимации персонажей и медвежат
+- Физика движений и столкновений
+- Прогрессивная система уровней с сохранением прогресса
+- Уникальные медвежата с анимацией на каждом уровне
+- Звуковые эффекты для погружения в игровой процесс
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## ⚙️ Установка и запуск
 
-## Learn More
+1. Клонируйте репозиторий:
+```
+git clone https://github.com/yourusername/react-lucky-pet.git
+cd react-lucky-pet
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+2. Установите зависимости:
+```
+npm install
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+3. Запустите приложение:
+```
+npm start
+```
 
-### Code Splitting
+Приложение будет доступно по адресу [http://localhost:3000](http://localhost:3000).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## 🛠️ Сборка для продакшена
 
-### Analyzing the Bundle Size
+```
+npm run build
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## 🐻 Особенности медвежат
 
-### Making a Progressive Web App
+Каждый уровень содержит уникального медвежонка:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+1. **Медвежонок-альпинист** - прыгает от радости, когда вы достигаете вершины
+2. **Медвежонок-дайвер** - в маске и трубке на финише водного уровня, празднует ваш успех выпуская пузыри и машет ластами
+3. **Медвежонок-финишер** - держит флаг финиша и появляется после сбора всех монет
 
-### Advanced Configuration
+## 📱 Совместимость
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- Приложение оптимизировано для работы в современных браузерах
+- Поддерживает как компьютеры, так и мобильные устройства
 
-### Deployment
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Разработано с ❤️ для всех любителей игр и милых медвежат

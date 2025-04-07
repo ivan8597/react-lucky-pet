@@ -74,24 +74,39 @@
   height: 40px;
   position: absolute;
   transition: all 0.3s ease;
+  animation: coin-float 3s infinite ease-in-out;
+  border-radius: 50%;
+  background: #ffd700 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e6c200;
+  background-image: none !important;
+}
+
+.coin::before {
+  content: none !important;
 }
 
 .coin::after {
-  content: '🪙';
-  font-size: 35px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: coin-spin 2s infinite linear;
+  content: none !important;
 }
 
-@keyframes coin-spin {
+@keyframes coin-float {
   0% {
-    transform: translate(-50%, -50%) rotate(0deg);
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-5px) rotate(2deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(5px) rotate(-2deg);
   }
   100% {
-    transform: translate(-50%, -50%) rotate(360deg);
+    transform: translateY(0) rotate(0deg);
   }
 }
 
@@ -104,8 +119,12 @@
     transform: scale(1);
     opacity: 1;
   }
+  50% {
+    transform: scale(1.5) rotate(180deg);
+    opacity: 0.5;
+  }
   100% {
-    transform: scale(1.5);
+    transform: scale(2);
     opacity: 0;
   }
 }
@@ -159,5 +178,65 @@
   }
   100% {
     background-position: 100px 0;
+  }
+}
+
+/* Анимация для бабочек */
+@keyframes butterfly-fly-x {
+  0% {
+    transform: translateX(-50px) rotate(-5deg);
+  }
+  50% {
+    transform: translateX(0) rotate(0deg);
+  }
+  100% {
+    transform: translateX(50px) rotate(5deg);
+  }
+}
+
+@keyframes butterfly-fly-y {
+  0% {
+    transform: translateY(-15px);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(15px);
+  }
+}
+
+@keyframes butterfly-wing-left {
+  0% {
+    transform: rotateY(70deg) rotateX(10deg);
+    opacity: 1;
+  }
+  100% {
+    transform: rotateY(10deg) rotateX(-10deg);
+    opacity: 0.9;
+  }
+}
+
+@keyframes butterfly-wing-right {
+  0% {
+    transform: rotateY(-70deg) rotateX(10deg);
+    opacity: 1;
+  }
+  100% {
+    transform: rotateY(-10deg) rotateX(-10deg);
+    opacity: 0.9;
+  }
+}
+
+/* Анимация медвежонка */
+@keyframes bear-walk {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+  100% {
+    transform: translateY(0);
   }
 } 

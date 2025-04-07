@@ -32,6 +32,7 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
   const [isHit, setIsHit] = useState<boolean>(false);
   const [isInvulnerable, setIsInvulnerable] = useState(false);
   const [audio] = useState(() => new Audio(RainSound));
+  const [bearCelebrating, setBearCelebrating] = useState<boolean>(false);
 
   const hitAudioRef = React.createRef<HTMLAudioElement>();
   const victoryAudioRef = React.createRef<HTMLAudioElement>();
@@ -248,6 +249,7 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
 
   useEffect(() => {
     if (stage === Stage.GAME && currentLogIndex === logs.length - 1) {
+      setBearCelebrating(true);
       setStage(Stage.FINISH);
       victoryAudioRef.current?.play();
       setTimeout(() => {
@@ -282,6 +284,50 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
 
   return (
     <>
+      <style>
+        {`
+          @keyframes bubbleRise {
+            0% { transform: translateY(0); opacity: 0.8; }
+            100% { transform: translateY(-30px); opacity: 0; }
+          }
+          
+          @keyframes bearJump {
+            0% { transform: translateY(0) translateX(-50%); }
+            40% { transform: translateY(-15px) translateX(-50%); }
+            60% { transform: translateY(-15px) translateX(-50%); }
+            100% { transform: translateY(0) translateX(-50%); }
+          }
+          
+          @keyframes finsFlap {
+            0% { transform: rotate(-10deg); }
+            50% { transform: rotate(-30deg); }
+            100% { transform: rotate(-10deg); }
+          }
+          
+          @keyframes finsFlipRight {
+            0% { transform: rotate(10deg); }
+            50% { transform: rotate(30deg); }
+            100% { transform: rotate(10deg); }
+          }
+          
+          @keyframes celebrateWave {
+            0% { transform: rotate(-25deg); }
+            50% { transform: rotate(-45deg); }
+            100% { transform: rotate(-25deg); }
+          }
+          
+          @keyframes celebrateWaveRight {
+            0% { transform: rotate(25deg); }
+            50% { transform: rotate(45deg); }
+            100% { transform: rotate(25deg); }
+          }
+          
+          @keyframes moreBubbles {
+            0% { transform: translateY(0); opacity: 0.9; }
+            100% { transform: translateY(-40px); opacity: 0; }
+          }
+        `}
+      </style>
       <audio ref={hitAudioRef} src={hitSound} preload="auto"></audio>
       <audio ref={victoryAudioRef} src={victorySound} preload="auto"></audio>
       {stage === Stage.START ? (
@@ -312,11 +358,7 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
               />
             ))}
           </div>
-          <div className="birds-container">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <div key={index} className="bird" />
-            ))}
-          </div>
+          
           <div className="river-container">
             <div className="water-layer" style={{
               position: "absolute",
@@ -419,6 +461,269 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
             <div className="finish-line" style={{ left: `${logPositions[8].x + 50}px`, bottom: "150px" }}>
               🚩
             </div>
+            
+            {/* Медвежонок в подводной маске и трубке возле финишного флага */}
+            {logs.length > 0 && (
+              <div 
+                style={{
+                  position: "absolute",
+                  left: `${logPositions[8].x}px`,
+                  bottom: "150px",
+                  width: "50px",
+                  height: "60px",
+                  zIndex: 5
+                }}
+              >
+                {/* Тело медвежонка */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '40px',
+                  height: '35px',
+                  background: '#8B4513',
+                  borderRadius: '50% 50% 40% 40%',
+                  zIndex: 2,
+                  animation: bearCelebrating ? 'bearJump 0.6s infinite' : 'none'
+                }} />
+                
+                {/* Голова медвежонка */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '25px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '30px',
+                  height: '30px',
+                  background: '#8B4513',
+                  borderRadius: '50%',
+                  zIndex: 3,
+                  animation: bearCelebrating ? 'bearJump 0.6s infinite' : 'none'
+                }}>
+                  {/* Ушки */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '-8px',
+                    left: '2px',
+                    width: '12px',
+                    height: '12px',
+                    background: '#8B4513',
+                    borderRadius: '50%'
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    top: '-8px',
+                    right: '2px',
+                    width: '12px',
+                    height: '12px',
+                    background: '#8B4513',
+                    borderRadius: '50%'
+                  }} />
+                  
+                  {/* Мордочка */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '-2px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '18px',
+                    height: '12px',
+                    background: '#D2B48C',
+                    borderRadius: '30% 30% 50% 50%'
+                  }} />
+                  
+                  {/* Подводная маска */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '5px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '25px',
+                    height: '15px',
+                    background: 'rgba(0, 200, 255, 0.4)',
+                    border: '2px solid #555',
+                    borderRadius: '50%',
+                    boxShadow: 'inset 0 0 5px rgba(255, 255, 255, 0.6)'
+                  }} />
+                  
+                  {/* Глаза через маску */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '9px',
+                    left: '8px',
+                    width: '4px',
+                    height: '4px',
+                    background: 'black',
+                    borderRadius: '50%',
+                    zIndex: 4
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    top: '9px',
+                    right: '8px',
+                    width: '4px',
+                    height: '4px',
+                    background: 'black',
+                    borderRadius: '50%',
+                    zIndex: 4
+                  }} />
+                </div>
+                
+                {/* Трубка для дыхания */}
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  right: '5px',
+                  width: '5px',
+                  height: '25px',
+                  background: '#ff6a00',
+                  borderRadius: '5px',
+                  transform: 'rotate(-20deg)',
+                  zIndex: 1
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  top: '5px',
+                  right: '0',
+                  width: '12px',
+                  height: '8px',
+                  background: '#ff6a00',
+                  borderRadius: '5px',
+                  zIndex: 1
+                }} />
+                
+                {/* Пузырьки воздуха - больше пузырьков при праздновании */}
+                <div style={{
+                  position: 'absolute',
+                  top: '0',
+                  right: '3px',
+                  width: '4px',
+                  height: '4px',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  borderRadius: '50%',
+                  animation: bearCelebrating ? 'moreBubbles 1.5s infinite' : 'bubbleRise 3s infinite'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  right: '8px',
+                  width: '3px',
+                  height: '3px',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  borderRadius: '50%',
+                  animation: bearCelebrating ? 'moreBubbles 1s infinite 0.3s' : 'bubbleRise 2.5s infinite 0.5s'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  top: '-10px',
+                  right: '5px',
+                  width: '5px',
+                  height: '5px',
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  borderRadius: '50%',
+                  animation: bearCelebrating ? 'moreBubbles 2s infinite 0.7s' : 'bubbleRise 4s infinite 1s'
+                }} />
+                
+                {/* Дополнительные пузырьки при праздновании */}
+                {bearCelebrating && (
+                  <>
+                    <div style={{
+                      position: 'absolute',
+                      top: '-7px',
+                      right: '10px',
+                      width: '6px',
+                      height: '6px',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      borderRadius: '50%',
+                      animation: 'moreBubbles 1.8s infinite 0.2s'
+                    }} />
+                    <div style={{
+                      position: 'absolute',
+                      top: '-3px',
+                      right: '2px',
+                      width: '4px',
+                      height: '4px',
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      borderRadius: '50%',
+                      animation: 'moreBubbles 1.3s infinite 0.5s'
+                    }} />
+                  </>
+                )}
+                
+                {/* Руки */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '20px',
+                  left: '2px',
+                  width: '12px',
+                  height: '20px',
+                  background: '#8B4513',
+                  borderRadius: '30%',
+                  transform: 'rotate(-25deg)',
+                  zIndex: 1,
+                  animation: bearCelebrating ? 'celebrateWave 0.4s infinite' : 'none'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  bottom: '20px',
+                  right: '2px',
+                  width: '12px',
+                  height: '20px',
+                  background: '#8B4513',
+                  borderRadius: '30%',
+                  transform: 'rotate(25deg)',
+                  zIndex: 1,
+                  animation: bearCelebrating ? 'celebrateWaveRight 0.4s infinite' : 'none'
+                }} />
+                
+                {/* Ноги */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '0px',
+                  left: '7px',
+                  width: '10px',
+                  height: '12px',
+                  background: '#8B4513',
+                  borderRadius: '30% 30% 50% 50%',
+                  animation: bearCelebrating ? 'bearJump 0.6s infinite' : 'none'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  bottom: '0px',
+                  right: '7px',
+                  width: '10px',
+                  height: '12px',
+                  background: '#8B4513',
+                  borderRadius: '30% 30% 50% 50%',
+                  animation: bearCelebrating ? 'bearJump 0.6s infinite' : 'none'
+                }} />
+                
+                {/* Ласты */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '-5px',
+                  left: '2px',
+                  width: '18px',
+                  height: '8px',
+                  background: '#4d94ff',
+                  borderRadius: '0 0 50% 50%',
+                  transform: 'rotate(-10deg)',
+                  animation: bearCelebrating ? 'finsFlap 0.3s infinite' : 'none'
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  bottom: '-5px',
+                  right: '2px',
+                  width: '18px',
+                  height: '8px',
+                  background: '#4d94ff',
+                  borderRadius: '0 0 50% 50%',
+                  transform: 'rotate(10deg)',
+                  animation: bearCelebrating ? 'finsFlipRight 0.3s infinite' : 'none'
+                }} />
+              </div>
+            )}
           </div>
           <div className="game-info">
             <div className="time">Time: {time}</div>

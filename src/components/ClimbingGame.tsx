@@ -36,6 +36,7 @@ const ClimbingGame: React.FC<ClimbingGameProps> = ({ onComplete }) => {
   const [savedScores, setSavedScores] = useState<number>(0);
   const [isFinalScore, setIsFinalScore] = useState<number>(0);
   const [rockSizes, setRockSizes] = useState<string[]>([]);
+  const [bearJumping, setBearJumping] = useState<boolean>(false);
 
   const audioRef = React.createRef<HTMLAudioElement>();
   const hitAudioRef = React.createRef<HTMLAudioElement>();
@@ -244,6 +245,7 @@ const ClimbingGame: React.FC<ClimbingGameProps> = ({ onComplete }) => {
         setSavedScores(finalScore);
       }
       setStage(Stage.FINISH);
+      setBearJumping(true);
       victoryAudioRef.current?.play();
       audioRef.current?.pause();
       audioRef.current.currentTime = 0;
@@ -283,6 +285,26 @@ const ClimbingGame: React.FC<ClimbingGameProps> = ({ onComplete }) => {
 
   return (
     <>
+      <style>
+        {`
+          @keyframes bearJump {
+            0% { transform: translateY(0) translateX(-50%); }
+            40% { transform: translateY(-15px) translateX(-50%); }
+            60% { transform: translateY(-15px) translateX(-50%); }
+            100% { transform: translateY(0) translateX(-50%); }
+          }
+          @keyframes bearArmsWave {
+            0% { transform: rotate(-20deg); }
+            50% { transform: rotate(-40deg); }
+            100% { transform: rotate(-20deg); }
+          }
+          @keyframes bearArmsWaveRight {
+            0% { transform: rotate(20deg); }
+            50% { transform: rotate(40deg); }
+            100% { transform: rotate(20deg); }
+          }
+        `}
+      </style>
       <audio ref={hitAudioRef} src={hitSound} preload="auto"></audio>
       <audio ref={audioRef} src={gameMusic} loop />
       <audio ref={victoryAudioRef} src={victorySound} preload="auto"></audio>
@@ -354,6 +376,157 @@ const ClimbingGame: React.FC<ClimbingGameProps> = ({ onComplete }) => {
           >
             🚩
           </div>
+          
+          {/* Медвежонок у финиша */}
+          <div 
+            style={{
+              position: "absolute",
+              left: `${400 + 4 * 190 - 50}px`,
+              bottom: `${4 * lineStep + 30}px`,
+              width: "45px",
+              height: "55px",
+              zIndex: 2,
+            }}
+          >
+            {/* Тело медвежонка */}
+            <div style={{
+              position: 'absolute',
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '35px',
+              height: '38px',
+              background: '#8B4513',
+              borderRadius: '50% 50% 40% 40%',
+              zIndex: 2,
+              animation: bearJumping ? 'bearJump 0.6s infinite' : 'none'
+            }} />
+            
+            {/* Голова медвежонка */}
+            <div style={{
+              position: 'absolute',
+              bottom: '28px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '28px',
+              height: '28px',
+              background: '#8B4513',
+              borderRadius: '50%',
+              zIndex: 3,
+              animation: bearJumping ? 'bearJump 0.6s infinite' : 'none'
+            }}>
+              {/* Ушки */}
+              <div style={{
+                position: 'absolute',
+                top: '-8px',
+                left: '2px',
+                width: '12px',
+                height: '12px',
+                background: '#8B4513',
+                borderRadius: '50%'
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '-8px',
+                right: '2px',
+                width: '12px',
+                height: '12px',
+                background: '#8B4513',
+                borderRadius: '50%'
+              }} />
+              
+              {/* Мордочка */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-2px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '18px',
+                height: '12px',
+                background: '#D2B48C',
+                borderRadius: '30% 30% 50% 50%'
+              }} />
+              
+              {/* Глаза */}
+              <div style={{
+                position: 'absolute',
+                top: '9px',
+                left: '7px',
+                width: '4px',
+                height: '4px',
+                background: 'black',
+                borderRadius: '50%'
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '9px',
+                right: '7px',
+                width: '4px',
+                height: '4px',
+                background: 'black',
+                borderRadius: '50%'
+              }} />
+              
+              {/* Нос */}
+              <div style={{
+                position: 'absolute',
+                top: '16px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '7px',
+                height: '5px',
+                background: 'black',
+                borderRadius: '50%'
+              }} />
+            </div>
+            
+            {/* Руки */}
+            <div style={{
+              position: 'absolute',
+              top: '25px',
+              left: '2px',
+              width: '12px',
+              height: '20px',
+              background: '#8B4513',
+              borderRadius: '30%',
+              transform: 'rotate(-20deg)',
+              animation: bearJumping ? 'bearArmsWave 0.3s infinite' : 'none'
+            }} />
+            <div style={{
+              position: 'absolute',
+              top: '25px',
+              right: '2px',
+              width: '12px',
+              height: '20px',
+              background: '#8B4513',
+              borderRadius: '30%',
+              transform: 'rotate(20deg)',
+              animation: bearJumping ? 'bearArmsWaveRight 0.3s infinite' : 'none'
+            }} />
+            
+            {/* Ноги */}
+            <div style={{
+              position: 'absolute',
+              bottom: '0px',
+              left: '7px',
+              width: '10px',
+              height: '12px',
+              background: '#8B4513',
+              borderRadius: '30% 30% 50% 50%',
+              animation: bearJumping ? 'bearJump 0.6s infinite' : 'none'
+            }} />
+            <div style={{
+              position: 'absolute',
+              bottom: '0px',
+              right: '7px',
+              width: '10px',
+              height: '12px',
+              background: '#8B4513',
+              borderRadius: '30% 30% 50% 50%',
+              animation: bearJumping ? 'bearJump 0.6s infinite' : 'none'
+            }} />
+          </div>
+          
           <div className="list">z вперед, x назад</div>
           <div className="colnse"></div>
 

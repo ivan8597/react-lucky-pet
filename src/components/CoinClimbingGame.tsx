@@ -45,11 +45,42 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
     { x: 500, y: 350 },
     { x: 800, y: 350 },
   ]);
+  const [showFinishBear, setShowFinishBear] = useState(false);
   const grassBlades = React.useMemo(() => 
-    Array.from({ length: 100 }).map(() => ({
+    Array.from({ length: 200 }).map(() => ({
       height: 20 + Math.random() * 30,
       rotation: -5 + Math.random() * 10
     })), []);
+  
+  // Создаем бабочек с разными траекториями
+  const butterflies = React.useMemo(() => 
+    Array.from({ length: 10 }).map(() => ({
+      x: Math.random() * 900,
+      y: 100 + Math.random() * 200,
+      size: 20 + Math.random() * 15,
+      speedX: (0.5 + Math.random() * 1) * (Math.random() > 0.5 ? 1 : -1),
+      speedY: 0.3 + Math.random() * 0.7,
+      flapSpeed: 0.1 + Math.random() * 0.3,
+      rotation: Math.random() * 20 - 10,
+      wingColor: ['#f0a9a9', '#f9d5e5', '#ffb8b8', '#d1b3ff', '#b3d9ff', '#f8e8a0'][Math.floor(Math.random() * 6)],
+      bodyColor: ['#bf7c7c', '#a85e5e', '#8d4f4f', '#774444', '#5e3636'][Math.floor(Math.random() * 5)]
+    })), []);
+    
+  // Состояние медвежонка
+  const [bear, setBear] = useState({
+    x: 50,
+    direction: 'right',
+    isWalking: true,
+    lastHoneyTime: Date.now()
+  });
+  
+  // Состояние бочонка меда
+  const [honeyPot, setHoneyPot] = useState({
+    x: 0,
+    y: 0,
+    active: false,
+    verticalSpeed: 0
+  });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -179,7 +210,7 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
         ) {
           setLives(prev => Math.max(0, prev - 1));
           if (lives <= 1) {
-            setGameOver(true);
+          setGameOver(true);
             audio.pause();
             audio.currentTime = 0;
           } else {
@@ -204,15 +235,89 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
         })
       );
 
-      if (coins.every((coin) => coin.collected)) {
+      // Проверка на показ финишного медвежонка
+      const allCoinsCollected = coins.every(coin => coin.collected);
+      if (allCoinsCollected && !showFinishBear) {
+        setShowFinishBear(true);
+      }
+
+      // Проверка на достижение финиша
+      if (showFinishBear && 
+          Math.abs(climber.x - 950) < 50 && 
+          Math.abs(climber.y - 450) < 30) {
         setVictory(true);
         audio.pause();
         audio.currentTime = 0;
       }
+
+      // Перемещение медвежонка и логика бочонка меда
+      setBear(prev => {
+        let newX = prev.x;
+        let newDirection = prev.direction;
+        const currentTime = Date.now();
+        let lastHoneyTime = prev.lastHoneyTime;
+        
+        // Случайная генерация бочонка меда каждые 15-25 секунд
+        if (!honeyPot.active && currentTime - prev.lastHoneyTime > 15000 + Math.random() * 10000) {
+          setHoneyPot({
+            x: prev.x,
+            y: 50, // Начальная позиция на уровне медвежонка
+            active: true,
+            verticalSpeed: -5 // Начальная скорость вверх (была -10, уменьшаем)
+          });
+          lastHoneyTime = currentTime;
+        }
+
+        if (prev.direction === 'right') {
+          newX += 0.5;
+          if (newX > 950) {
+            newDirection = 'left';
+          }
+        } else {
+          newX -= 0.5;
+          if (newX < 50) {
+            newDirection = 'right';
+          }
+        }
+
+        return {
+          ...prev,
+          x: newX,
+          direction: newDirection,
+          lastHoneyTime
+        };
+      });
+      
+      // Обновление позиции бочонка меда
+      if (honeyPot.active) {
+        setHoneyPot(prev => {
+          // Физика полета бочонка меда
+          const newY = prev.y + prev.verticalSpeed;
+          const newVerticalSpeed = prev.verticalSpeed + 0.15; // Гравитация (была 0.25, уменьшаем)
+          
+          // Проверка коллизии с альпинистом
+          if (Math.abs(climber.x - prev.x) < 40 && Math.abs(climber.y - newY) < 40) {
+            // Поймал бочонок - прибавляем жизнь
+            setLives(l => Math.min(l + 1, 5)); // Максимум 5 жизней
+            return { ...prev, active: false };
+          }
+          
+          // Если бочонок упал ниже экрана или вылетел за верхнюю границу, деактивируем его
+          if (newY > 500 || newY < -50) {
+            return { ...prev, active: false };
+          }
+          
+          return {
+            ...prev,
+            y: newY,
+            verticalSpeed: newVerticalSpeed
+          };
+        });
+      }
     }, 1000 / 60);
 
     return () => clearInterval(gameLoop);
-  }, [climber.x, climber.y, spiders, coins, gameOver, victory, lives, isInvulnerable, audio]);
+  }, [climber.x, climber.y, spiders, coins, gameOver, victory, lives, isInvulnerable, audio, honeyPot.active, showFinishBear]);
 
   useEffect(() => {
     if (stage === Stage.GAME) {
@@ -268,16 +373,16 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
           </button>
         </div>
       ) : (
-        <div
-          style={{
+    <div
+      style={{
             width: "100vw",
             height: "100vh",
             background: "linear-gradient(to bottom, #87CEEB, #1E90FF)",
-            position: "relative",
-            overflow: "hidden",
-          }}
-          tabIndex={0}
-          autoFocus
+        position: "relative",
+        overflow: "hidden",
+      }}
+      tabIndex={0}
+      autoFocus
         >
           <div className="sun-container" style={{ top: "20px", right: "100px" }}>
             <div className="sun" />
@@ -292,6 +397,299 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
               />
             ))}
           </div>
+          
+          {/* Бабочки */}
+          {butterflies.map((butterfly, index) => (
+            <div
+              key={`butterfly-${index}`}
+              style={{
+                position: "absolute",
+                left: butterfly.x,
+                top: butterfly.y,
+                width: butterfly.size,
+                height: butterfly.size * 0.8,
+                zIndex: 5,
+                transform: `rotate(${butterfly.rotation}deg)`,
+                animation: `
+                  butterfly-fly-x ${8 / Math.abs(butterfly.speedX)}s ease-in-out infinite alternate,
+                  butterfly-fly-y ${6 / butterfly.speedY}s ease-in-out infinite alternate
+                `,
+                animationDelay: `${index * 0.7}s, ${index * 0.5}s`,
+                pointerEvents: "none"
+              }}
+            >
+              {/* Тело бабочки */}
+              <div style={{
+                position: "absolute",
+                left: "50%",
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+                width: butterfly.size * 0.1,
+                height: butterfly.size * 0.6,
+                background: butterfly.bodyColor,
+                borderRadius: "50%",
+                zIndex: 2
+              }}>
+                {/* Головка бабочки */}
+                <div style={{
+                  position: "absolute",
+                  top: "-15%",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: butterfly.size * 0.15,
+                  height: butterfly.size * 0.15,
+                  background: butterfly.bodyColor,
+                  borderRadius: "50%"
+                }}></div>
+                
+                {/* Усики */}
+                <div style={{
+                  position: "absolute",
+                  top: "-20%",
+                  left: "30%",
+                  width: "1px",
+                  height: butterfly.size * 0.2,
+                  background: "#000",
+                  transform: "rotate(-30deg)",
+                  transformOrigin: "bottom center"
+                }}></div>
+                <div style={{
+                  position: "absolute",
+                  top: "-20%",
+                  right: "30%",
+                  width: "1px",
+                  height: butterfly.size * 0.2,
+                  background: "#000",
+                  transform: "rotate(30deg)",
+                  transformOrigin: "bottom center"
+                }}></div>
+              </div>
+              
+              {/* Левое крыло */}
+              <div style={{
+                position: "absolute",
+                left: "0",
+                top: "20%",
+                width: butterfly.size * 0.5,
+                height: butterfly.size * 0.7,
+                borderRadius: "60% 40% 70% 30% / 70% 50% 50% 30%",
+                background: `linear-gradient(45deg, ${butterfly.wingColor} 70%, rgba(255,255,255,0.8))`,
+                transformOrigin: "right center",
+                boxShadow: "0 0 10px rgba(0,0,0,0.1)",
+                animation: `butterfly-wing-left ${1.2 / butterfly.flapSpeed}s ease-in-out infinite alternate`
+              }}></div>
+              
+              {/* Правое крыло */}
+              <div style={{
+                position: "absolute",
+                right: "0",
+                top: "20%",
+                width: butterfly.size * 0.5,
+                height: butterfly.size * 0.7,
+                borderRadius: "40% 60% 30% 70% / 50% 70% 30% 50%",
+                background: `linear-gradient(-45deg, ${butterfly.wingColor} 70%, rgba(255,255,255,0.8))`,
+                transformOrigin: "left center",
+                boxShadow: "0 0 10px rgba(0,0,0,0.1)",
+                animation: `butterfly-wing-right ${1.2 / butterfly.flapSpeed}s ease-in-out infinite alternate`,
+                animationDelay: "0.1s"
+              }}></div>
+            </div>
+          ))}
+          
+          {/* Медвежонок внизу */}
+          <div 
+            style={{
+              position: 'absolute',
+              bottom: '50px',
+              left: `${bear.x}px`,
+              width: '40px',
+              height: '50px',
+              zIndex: 4,
+              transform: `scaleX(${bear.direction === 'right' ? 1 : -1})`,
+              transition: 'transform 0.2s'
+            }}
+          >
+            {/* Тело медвежонка */}
+            <div style={{
+              position: 'absolute',
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '30px',
+              height: '35px',
+              background: '#8B4513',
+              borderRadius: '50% 50% 40% 40%',
+              zIndex: 2
+            }} />
+            
+            {/* Голова медвежонка */}
+            <div style={{
+              position: 'absolute',
+              bottom: '25px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '25px',
+              height: '25px',
+              background: '#8B4513',
+              borderRadius: '50%',
+              zIndex: 3
+            }}>
+              {/* Ушки */}
+              <div style={{
+                position: 'absolute',
+                top: '-8px',
+                left: '2px',
+                width: '10px',
+                height: '10px',
+                background: '#8B4513',
+                borderRadius: '50%'
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '-8px',
+                right: '2px',
+                width: '10px',
+                height: '10px',
+                background: '#8B4513',
+                borderRadius: '50%'
+              }} />
+              
+              {/* Мордочка */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-2px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '15px',
+                height: '10px',
+                background: '#D2B48C',
+                borderRadius: '30% 30% 50% 50%'
+              }} />
+              
+              {/* Глаза */}
+              <div style={{
+                position: 'absolute',
+                top: '8px',
+                left: '6px',
+                width: '4px',
+                height: '4px',
+                background: 'black',
+                borderRadius: '50%'
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '8px',
+                right: '6px',
+                width: '4px',
+                height: '4px',
+                background: 'black',
+                borderRadius: '50%'
+              }} />
+              
+              {/* Нос */}
+              <div style={{
+                position: 'absolute',
+                top: '14px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '6px',
+                height: '4px',
+                background: 'black',
+                borderRadius: '50%'
+              }} />
+            </div>
+            
+            {/* Лапки */}
+            <div style={{
+              position: 'absolute',
+              bottom: '0px',
+              left: '5px',
+              width: '8px',
+              height: '10px',
+              background: '#8B4513',
+              borderRadius: '30% 30% 50% 50%',
+              animation: `${bear.isWalking ? 'bear-walk 1s infinite alternate' : 'none'}`
+            }} />
+            <div style={{
+              position: 'absolute',
+              bottom: '0px',
+              right: '5px',
+              width: '8px',
+              height: '10px',
+              background: '#8B4513',
+              borderRadius: '30% 30% 50% 50%',
+              animation: `${bear.isWalking ? 'bear-walk 1s infinite alternate-reverse' : 'none'}`
+            }} />
+      </div>
+
+          {/* Бочонок меда */}
+          {honeyPot.active && (
+      <div
+        style={{
+                position: 'absolute',
+                left: honeyPot.x,
+                top: honeyPot.y,
+                width: '30px',
+                height: '35px',
+                zIndex: 5,
+                background: '#CD853F',
+                borderRadius: '5px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                transform: 'rotate(5deg)'
+              }}
+            >
+              {/* Верхняя часть бочонка */}
+              <div style={{
+                position: 'absolute',
+                top: '-5px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '25px',
+                height: '5px',
+                background: '#A0522D',
+                borderRadius: '5px 5px 0 0'
+              }} />
+              
+              {/* Полоски бочонка */}
+              <div style={{
+                position: 'absolute',
+                top: '7px',
+                left: 0,
+                width: '100%',
+                height: '3px',
+                background: '#A0522D'
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '17px',
+                left: 0,
+                width: '100%',
+                height: '3px',
+                background: '#A0522D'
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '27px',
+                left: 0,
+                width: '100%',
+                height: '3px',
+                background: '#A0522D'
+              }} />
+              
+              {/* Мед сверху */}
+              <div style={{
+                position: 'absolute',
+                top: '-8px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '16px',
+                height: '8px',
+                background: '#FFD700',
+                borderRadius: '40% 40% 0 0',
+                boxShadow: 'inset 0 3px 2px rgba(255,150,0,0.5)'
+              }} />
+            </div>
+          )}
           
           {/* Трава внизу */}
           <div style={{
@@ -323,8 +721,176 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
             ))}
           </div>
           
+          {/* Финишный медвежонок */}
+          {showFinishBear && (
+          <div 
+            style={{
+              position: 'absolute',
+              bottom: '50px',
+              right: '50px',
+              width: '45px',
+              height: '55px',
+              zIndex: 4
+            }}
+          >
+            {/* Тело медвежонка */}
+            <div style={{
+              position: 'absolute',
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '35px',
+              height: '38px',
+              background: '#8B4513',
+              borderRadius: '50% 50% 40% 40%',
+              zIndex: 2
+            }} />
+            
+            {/* Голова медвежонка */}
+            <div style={{
+              position: 'absolute',
+              bottom: '28px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '28px',
+              height: '28px',
+              background: '#8B4513',
+              borderRadius: '50%',
+              zIndex: 3
+            }}>
+              {/* Ушки */}
+              <div style={{
+                position: 'absolute',
+                top: '-8px',
+                left: '2px',
+                width: '12px',
+                height: '12px',
+                background: '#8B4513',
+                borderRadius: '50%'
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '-8px',
+                right: '2px',
+                width: '12px',
+                height: '12px',
+                background: '#8B4513',
+                borderRadius: '50%'
+              }} />
+              
+              {/* Мордочка */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-2px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '18px',
+                height: '12px',
+                background: '#D2B48C',
+                borderRadius: '30% 30% 50% 50%'
+              }} />
+              
+              {/* Глаза */}
+              <div style={{
+                position: 'absolute',
+                top: '9px',
+                left: '7px',
+                width: '4px',
+                height: '4px',
+                background: 'black',
+                borderRadius: '50%'
+              }} />
+              <div style={{
+                position: 'absolute',
+                top: '9px',
+                right: '7px',
+                width: '4px',
+                height: '4px',
+                background: 'black',
+                borderRadius: '50%'
+              }} />
+              
+              {/* Нос */}
+              <div style={{
+                position: 'absolute',
+                top: '16px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '7px',
+                height: '5px',
+                background: 'black',
+                borderRadius: '50%'
+              }} />
+            </div>
+            
+            {/* Руки */}
+            <div style={{
+              position: 'absolute',
+              top: '25px',
+              left: '2px',
+              width: '12px',
+              height: '20px',
+              background: '#8B4513',
+              borderRadius: '30%',
+              transform: 'rotate(-20deg)'
+            }} />
+            <div style={{
+              position: 'absolute',
+              top: '25px',
+              right: '2px',
+              width: '12px',
+              height: '20px',
+              background: '#8B4513',
+              borderRadius: '30%',
+              transform: 'rotate(20deg)'
+            }} />
+            
+            {/* Ноги */}
+            <div style={{
+              position: 'absolute',
+              bottom: '0px',
+              left: '7px',
+              width: '10px',
+              height: '12px',
+              background: '#8B4513',
+              borderRadius: '30% 30% 50% 50%'
+            }} />
+            <div style={{
+              position: 'absolute',
+              bottom: '0px',
+              right: '7px',
+              width: '10px',
+              height: '12px',
+              background: '#8B4513',
+              borderRadius: '30% 30% 50% 50%'
+            }} />
+            
+            {/* Флажок финиша */}
+            <div style={{
+              position: 'absolute',
+              top: '-30px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '4px',
+              height: '40px',
+              background: '#888',
+              zIndex: 1
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '0',
+                left: '4px',
+                width: '20px',
+                height: '15px',
+                background: '#ff4d4d',
+                clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'
+              }} />
+            </div>
+          </div>
+          )}
+          
           <div style={{ 
-            position: "absolute", 
+          position: "absolute",
             top: 10, 
             left: 10, 
             color: "white", 
@@ -339,32 +905,32 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
           <div
             className={`climber ${isMoving ? "moving" : ""} ${climber.isJumping ? "jumping" : ""} ${isInvulnerable ? "invulnerable" : ""}`}
             style={{
-              left: climber.x,
-              top: climber.y,
+          left: climber.x,
+          top: climber.y,
               opacity: isInvulnerable ? 0.5 : 1,
+        }}
+      />
+
+      {coins.map((coin, index) =>
+        !coin.collected ? (
+          <div
+            key={index}
+                className={`coin ${coin.collected ? "collected" : ""}`}
+            style={{
+              left: coin.x,
+              top: coin.y,
             }}
           />
+        ) : null
+      )}
 
-          {coins.map((coin, index) =>
-            !coin.collected ? (
-              <div
-                key={index}
-                className={`coin ${coin.collected ? "collected" : ""}`}
-                style={{
-                  left: coin.x,
-                  top: coin.y,
-                }}
-              />
-            ) : null
-          )}
-
-          {spiders.map((spider, index) => (
-            <div
-              key={index}
+      {spiders.map((spider, index) => (
+        <div
+          key={index}
               className="spider"
-              style={{
-                left: spider.x,
-                top: spider.y,
+          style={{
+            left: spider.x,
+            top: spider.y,
               }}
             />
           ))}
@@ -382,9 +948,9 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
                 background: "#8B4513",
                 borderRadius: "5px",
                 boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
-              }}
-            />
-          ))}
+          }}
+        />
+      ))}
 
           <div className="controls" style={{
             position: "absolute",
@@ -399,7 +965,7 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
             <p>↑ Прыжок</p>
           </div>
 
-          {gameOver && (
+      {gameOver && (
             <div 
               style={{ 
                 position: "absolute", 
@@ -414,8 +980,8 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
               }}
             >
               <div style={{ fontSize: "24px", marginBottom: "20px" }}>Игра окончена!</div>
-              <button
-                onClick={() => {
+          <button
+            onClick={() => {
                   setStage(Stage.START);
                 }}
                 style={{
@@ -426,14 +992,14 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
                   border: "none",
                   borderRadius: "5px",
                   cursor: "pointer",
-                }}
-              >
-                Начать заново
-              </button>
-            </div>
-          )}
+            }}
+          >
+            Начать заново
+          </button>
+        </div>
+      )}
 
-          {victory && (
+      {victory && (
             <div 
               style={{ 
                 position: "absolute", 
