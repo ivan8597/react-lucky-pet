@@ -39,4 +39,125 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Стили для пауков */
+.spider {
+  width: 50px;
+  height: 50px;
+  position: absolute;
+  transition: all 0.3s ease;
+}
+
+.spider::after {
+  content: '🕷️';
+  font-size: 40px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: spider-move 1s infinite alternate;
+}
+
+@keyframes spider-move {
+  0% {
+    transform: translate(-50%, -60%);
+  }
+  100% {
+    transform: translate(-50%, -40%);
+  }
+}
+
+/* Стили для монет */
+.coin {
+  width: 40px;
+  height: 40px;
+  position: absolute;
+  transition: all 0.3s ease;
+}
+
+.coin::after {
+  content: '🪙';
+  font-size: 35px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: coin-spin 2s infinite linear;
+}
+
+@keyframes coin-spin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.coin.collected {
+  animation: collect 0.5s forwards;
+}
+
+@keyframes collect {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.game2-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #87CEEB, #1E90FF);
+}
+
+.river {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 150px;
+  background: #4169E1;
+  animation: wave 2s infinite linear;
+}
+
+.boat {
+  position: absolute;
+  width: 80px;
+  height: 40px;
+  background: #8B4513;
+  border-radius: 20px;
+  transition: bottom 0.5s ease;
+}
+
+.log {
+  position: absolute;
+  width: 100px;
+  height: 30px;
+  background: #8B4513;
+  border-radius: 15px;
+}
+
+.game2-ui {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  color: white;
+  font-size: 24px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes wave {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 100px 0;
+  }
 } 

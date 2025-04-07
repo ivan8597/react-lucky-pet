@@ -1,0 +1,170 @@
+.river-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #87CEEB; /* Голубой цвет реки */
+}
+
+.climber {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  background: #8B4513; /* Коричневый цвет вместо изображения */
+  border-radius: 50%;
+  transition: all 0.15s ease; /* Плавный прыжок */
+}
+
+.climber.jumping {
+  transition: all 0.15s ease;
+}
+
+.climber.hit {
+  animation: blink 0.5s infinite; /* Мигание при попадании */
+}
+
+.log {
+  position: absolute;
+  width: 60px;
+  height: 20px;
+  background: #8B4513; /* Коричневый цвет бревна */
+  border-radius: 5px;
+}
+
+.fish {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 30px;
+  transition: bottom 0.1s ease; /* Плавное движение рыбы */
+}
+
+.fish::before {
+  content: '';
+}
+
+.fish.up::after {
+  content: '🐟';
+  transform: scaleX(1);
+}
+
+.fish.down::after {
+  content: '🐟';
+  transform: scaleX(-1);
+}
+
+@keyframes swim {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.fish::after {
+  display: block;
+  animation: swim 2s infinite ease-in-out;
+}
+
+.wrapper {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.start-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #87CEEB;
+}
+
+.game-title {
+  font-size: 48px;
+  color: #fff;
+}
+
+.start-button {
+  padding: 10px 20px;
+  font-size: 24px;
+  background: #FFD700;
+  border: none;
+  cursor: pointer;
+}
+
+.youWin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 36px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 20px;
+  border-radius: 10px;
+}
+
+.game-info {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: orange;
+  font-size: 24px;
+}
+
+.controls {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  color: #fff;
+  font-size: 18px;
+}
+
+.finish-line {
+  position: absolute;
+  font-size: 40px;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Анимация для воды */
+@keyframes wave {
+  0% {
+    transform: translateY(0) scale(1, 0.3);
+  }
+  100% {
+    transform: translateY(-10px) scale(1, 0.5);
+  }
+}
+
+@keyframes splash {
+  0% {
+    transform: scale(0.8, 0.2);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1, 0.4);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.2, 0.3);
+    opacity: 0;
+  }
+}
+
+.water-layer {
+  box-shadow: 0 0 20px rgba(0, 195, 255, 0.7);
+}

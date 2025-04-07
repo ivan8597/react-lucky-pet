@@ -15,7 +15,11 @@ enum Stage {
   FINISH = "finish",
 }
 
-const ClimbingGame: React.FC = () => {
+interface ClimbingGameProps {
+  onComplete: (finalScore: number) => void;
+}
+
+const ClimbingGame: React.FC<ClimbingGameProps> = ({ onComplete }) => {
   const lineStep: number = 129;
 
   const [stage, setStage] = useState<Stage>(Stage.START);
@@ -23,7 +27,7 @@ const ClimbingGame: React.FC = () => {
   const [fallingRocks, setFallingRocks] = useState<number[]>([]);
   const [score, setScore] = useState<number>(0);
   const [topValues, setTopValues] = useState<number[]>([100, 0, 200, 0, 0]);
-  const [isThirdLineVisible, setIsThirdLineVisible] = useState<boolean>(false);
+  const [IsThirdLineVisible, setIsThirdLineVisible] = useState<boolean>(false); // Исправлено имя
   const [isSecondLineVisible, setIsSecondLineVisible] = useState<boolean>(false);
   const [isFirstLineVisible, setIsFirstLineVisible] = useState<boolean>(false);
   const [lives, setLives] = useState<number>(3);
@@ -129,28 +133,20 @@ const ClimbingGame: React.FC = () => {
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (stage !== Stage.GAME) {
-      return;
-    }
+    if (stage !== Stage.GAME) return;
 
     if (event.key === "x" || event.key === "ч") {
-      if (currentLineIndex >= 4) {
-        return;
-      }
+      if (currentLineIndex >= 4) return;
       if (
-        (currentLineIndex === 2 && isThirdLineVisible) ||
+        (currentLineIndex === 2 && IsThirdLineVisible) ||
         (currentLineIndex === 1 && isSecondLineVisible) ||
         (currentLineIndex === 3 && isFirstLineVisible)
-      ) {
-        return;
-      }
+      ) return;
       setIsMoving(true);
       setCurrentLineIndex(currentLineIndex + 1);
       setScore(prevScore => prevScore + 10);
     } else if (event.key === "z" || event.key === "я") {
-      if (currentLineIndex <= 0) {
-        return;
-      }
+      if (currentLineIndex <= 0) return;
       setIsMoving(true);
       setCurrentLineIndex(currentLineIndex - 1);
     }
@@ -192,22 +188,21 @@ const ClimbingGame: React.FC = () => {
     if (stage === Stage.GAME) {
       const toggleVisibility = () => {
         if (
-          (!isThirdLineVisible && currentLineIndex === 2) ||
+          (!IsThirdLineVisible && currentLineIndex === 2) ||
           (!isSecondLineVisible && currentLineIndex === 1) ||
           (!isFirstLineVisible && currentLineIndex === 3)
         ) {
           setCurrentLineIndex(0);
         }
-        setIsThirdLineVisible(!isThirdLineVisible);
+        setIsThirdLineVisible(!IsThirdLineVisible);
         setIsSecondLineVisible(!isSecondLineVisible);
         setIsFirstLineVisible(!isFirstLineVisible);
       };
 
       interval = setInterval(toggleVisibility, 990);
-
       return () => clearInterval(interval);
     }
-  }, [stage, isThirdLineVisible, isSecondLineVisible, isFirstLineVisible, currentLineIndex]);
+  }, [stage, IsThirdLineVisible, isSecondLineVisible, isFirstLineVisible, currentLineIndex]);
 
   useEffect(() => {
     let timerInterval: NodeJS.Timeout;
@@ -219,7 +214,7 @@ const ClimbingGame: React.FC = () => {
     }
 
     if (time === 0 && stage === Stage.GAME) {
-      let finalScore = score; // Сохраняем очки при истечении времени
+      let finalScore = score;
       setIsFinalScore(finalScore);
       if (finalScore > savedScores) {
         setSavedScores(finalScore);
@@ -228,6 +223,7 @@ const ClimbingGame: React.FC = () => {
       audioRef.current?.pause();
       audioRef.current.currentTime = 0;
       setTimeout(() => {
+        onComplete(finalScore); // Передаём финальный счёт
         resetGame();
       }, 3000);
     }
@@ -235,7 +231,7 @@ const ClimbingGame: React.FC = () => {
     return () => {
       if (timerInterval) clearInterval(timerInterval);
     };
-  }, [stage, time, score, savedScores]);
+  }, [stage, time, score, savedScores, onComplete]);
 
   useEffect(() => {
     if (currentLineIndex === 4) {
@@ -251,27 +247,28 @@ const ClimbingGame: React.FC = () => {
       victoryAudioRef.current?.play();
       audioRef.current?.pause();
       audioRef.current.currentTime = 0;
-      
       setTimeout(() => {
+        onComplete(finalScore); // Передаём финальный счёт
         resetGame();
       }, 3000);
     }
-  }, [currentLineIndex, score, lives, savedScores]);
+  }, [currentLineIndex, score, lives, savedScores, onComplete]);
 
   useEffect(() => {
     if (lives === 0) {
-      setIsFinalScore(0); // Обнуляем очки при потере всех жизней
-      if (0 > savedScores) { // Сравниваем с 0, так как очки обнуляются
+      setIsFinalScore(0);
+      if (0 > savedScores) {
         setSavedScores(0);
       }
       setStage(Stage.FINISH);
       audioRef.current?.pause();
       audioRef.current.currentTime = 0;
       setTimeout(() => {
+        onComplete(0); // Передаём 0 при проигрыше
         resetGame();
       }, 3000);
     }
-  }, [lives, savedScores]);
+  }, [lives, savedScores, onComplete]);
 
   useEffect(() => {
     const savedHighScore = localStorage.getItem('highScore');
@@ -286,21 +283,9 @@ const ClimbingGame: React.FC = () => {
 
   return (
     <>
-      <audio
-        ref={hitAudioRef}
-        src={hitSound}
-        preload="auto"
-      ></audio>
-      <audio 
-        ref={audioRef} 
-        src={gameMusic} 
-        loop 
-      />
-      <audio
-        ref={victoryAudioRef}
-        src={victorySound}
-        preload="auto"
-      ></audio>
+      <audio ref={hitAudioRef} src={hitSound} preload="auto"></audio>
+      <audio ref={audioRef} src={gameMusic} loop />
+      <audio ref={victoryAudioRef} src={victorySound} preload="auto"></audio>
       {stage === Stage.START ? (
         <div className="start-page">
           <div className="floating-snowflakes">
@@ -310,7 +295,7 @@ const ClimbingGame: React.FC = () => {
                 className="start-snowflake"
                 style={{
                   left: `${Math.random() * 100}%`,
-                  animationDelay: `${Math.random() * 5}s`
+                  animationDelay: `${Math.random() * 5}s`,
                 }}
               >
                 ❄️
@@ -324,10 +309,10 @@ const ClimbingGame: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div 
-          className="wrapper" 
-          tabIndex={0} 
-          onKeyDown={handleKeyDown} 
+        <div
+          className="wrapper"
+          tabIndex={0}
+          onKeyDown={handleKeyDown}
           onKeyUp={handleKeyUp}
           autoFocus
           style={{ outline: 'none' }}
@@ -347,7 +332,7 @@ const ClimbingGame: React.FC = () => {
                 className="sun-ray"
                 style={{
                   transform: `rotate(${index * 30}deg)`,
-                  animation: `ray-pulse 2s infinite alternate ${index * 0.2}s`
+                  animation: `ray-pulse 2s infinite alternate ${index * 0.2}s`,
                 }}
               />
             ))}
@@ -358,13 +343,13 @@ const ClimbingGame: React.FC = () => {
             ))}
           </div>
           <img className="mountains" src="/img/mountains.png" alt="mountains" />
-          <div 
+          <div
             style={{
               position: "absolute",
               left: `${400 + 4 * 190}px`,
               bottom: `${4 * lineStep + 50}px`,
               fontSize: "40px",
-              zIndex: 2
+              zIndex: 2,
             }}
           >
             🚩
@@ -373,7 +358,9 @@ const ClimbingGame: React.FC = () => {
           <div className="colnse"></div>
 
           {fallingRocks.map((rockIndex, index) => (
-            <div key={index} className={`falling-rock ${rockSizes[index] || 'medium'}`}
+            <div
+              key={index}
+              className={`falling-rock ${rockSizes[index] || 'medium'}`}
               style={{
                 left: `${400 + rockIndex * 190}px`,
                 top: `${topValues[rockIndex]}px`,
@@ -383,7 +370,7 @@ const ClimbingGame: React.FC = () => {
             </div>
           ))}
 
-          {!isThirdLineVisible && (
+          {!IsThirdLineVisible && (
             <div
               className="obstacle"
               style={{
@@ -427,45 +414,27 @@ const ClimbingGame: React.FC = () => {
           {stage === Stage.FINISH && (
             <div className="youWin">
               <div>
-                {currentLineIndex === 4 
+                {currentLineIndex === 4
                   ? `Вы победитель! Ваши очки: ${isFinalScore}`
-                  : `Игра окончена! Набрано очков: ${isFinalScore}`
-                }
+                  : `Игра окончена! Набрано очков: ${isFinalScore}`}
               </div>
             </div>
           )}
           <div
             className="time"
-            style={{
-              top: "49px",
-              left: "68px",
-              color: "orange",
-              fontSize: "24px",
-            }}
+            style={{ top: "49px", left: "68px", color: "orange", fontSize: "24px" }}
           >
             Time: {time}
           </div>
-
           <div
             className="score"
-            style={{
-              top: "49px",
-              right: "30px",
-              color: "orange",
-              fontSize: "24px",
-            }}
+            style={{ top: "49px", right: "30px", color: "orange", fontSize: "24px" }}
           >
             Score: {stage === Stage.FINISH ? isFinalScore : score}
           </div>
-
           <div
             className="lives"
-            style={{
-              top: "49px",
-              right: "30px",
-              color: "orange",
-              fontSize: "24px",
-            }}
+            style={{ top: "49px", right: "30px", color: "orange", fontSize: "24px" }}
           >
             Lives: {lives}
           </div>
