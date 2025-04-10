@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useContext, useRef, useMemo } from "react";
+import { motion, AnimatePresence, Variants, useAnimation } from "framer-motion";
 import hitSound from "./audio/hit.mp3";
 import victorySound from "./audio/p9.mp3";
 import RainSound from "./audio/Rain.mp3";
+import coinSound from "./audio/monetyi.mp3";
 import "../styles/Boat.css";
 import "../styles/Sun.css";
-
-
+import "../styles/StartPage.css";
+import { PauseContext } from "../App.tsx";
+import { StartScreen } from "./StartScreen.tsx";
+import { EndScreen } from "./EndScreen.tsx";
 
 enum Stage {
   START = "start",
@@ -17,43 +21,172 @@ interface BoatGameProps {
   onComplete?: () => void;
 }
 
-const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
+type Fish = {
+  x: number;
+  y: number;
+  direction: "up" | "down";
+  lastJumpTime: number;
+  jumpInterval: number;
+  isDangerous?: boolean;
+};
+
+type DecorativeFish = {
+  id: number;
+  x: number;
+  y: number;
+  direction: "left" | "right";
+  speed: number;
+  size: number;
+  color: string;
+  isDangerous?: boolean;
+};
+
+// Варианты анимаций для разных элементов
+const snowflakeVariants: Variants = {
+  animate: (i: number) => ({
+    y: [0, window.innerHeight],
+    x: [0, Math.sin(i) * 50],
+    opacity: [0.7, 1, 0.7, 1, 0.7, 0],
+    rotate: [0, 360],
+    transition: {
+      y: { duration: 10 + Math.random() * 5, repeat: Infinity, ease: "linear" },
+      x: { duration: 5 + Math.random() * 2, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" },
+      opacity: { duration: 3, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" },
+      rotate: { duration: 10, repeat: Infinity, ease: "linear" }
+    }
+  })
+};
+
+// Варианты анимации для альпиниста
+const climberVariants: Variants = {
+  idle: {
+    y: [0, -3, 0],
+    transition: {
+      y: { 
+        repeat: Infinity, 
+        duration: 2, 
+        ease: "easeInOut" 
+      }
+    }
+  },
+  jumping: {
+    scale: [1, 1.15, 1],
+    y: [0, 15, 0],
+    transition: {
+      duration: 0.6,
+      times: [0, 0.5, 1],
+      ease: ["easeOut", "easeIn"]
+    }
+  },
+  falling: {
+    rotate: [0, -10, 10, -10, 0],
+    transition: {
+      duration: 0.8,
+      ease: "easeInOut"
+    }
+  },
+  hit: {
+    scale: [1, 0.8, 1],
+    rotate: [0, 5, -5, 5, 0],
+    transition: {
+      duration: 0.5
+    }
+  }
+};
+
+const BoatGame: React.FC<BoatGameProps> = ({ onComplete }): JSX.Element => {
+  const { isPaused } = useContext(PauseContext);
   const [stage, setStage] = useState<Stage>(Stage.START);
+  const [currentLogIndex, setCurrentLogIndex] = useState<number>(0);
+  const [logs, setLogs] = useState<{ x: number; y: number; visible: boolean }[]>([]);
   const [climberPosition, setClimberPosition] = useState<{ x: number; y: number }>({ x: 0, y: 100 });
-  const [logs, setLogs] = useState<{ x: number; y: number }[]>([]);
-  const [fishes, setFishes] = useState<
-    { x: number; y: number; direction: "up" | "down"; lastJumpTime: number; jumpInterval: number }[]
-  >([]);
+  const [fishes, setFishes] = useState<Fish[]>([]);
+  const [decorativeFishes, setDecorativeFishes] = useState<DecorativeFish[]>([]);
   const [score, setScore] = useState<number>(0);
   const [lives, setLives] = useState<number>(3);
   const [time, setTime] = useState<number>(60);
-  const [currentLogIndex, setCurrentLogIndex] = useState<number>(0);
   const [isJumping, setIsJumping] = useState<boolean>(false);
   const [isHit, setIsHit] = useState<boolean>(false);
-  const [isInvulnerable, setIsInvulnerable] = useState(false);
+  const [isInvulnerable, setIsInvulnerable] = useState<boolean>(false);
   const [audio] = useState(() => new Audio(RainSound));
   const [bearCelebrating, setBearCelebrating] = useState<boolean>(false);
+  const [boats, setBoats] = useState<{ x: number; y: number; direction: number; bananasThrown: number }[]>([]);
+  const [bananas, setBananas] = useState<{ x: number; y: number; rotation: number }[]>([]);
+  const [throwingTime, setThrowingTime] = useState<number>(9);
+  const [lastThrowTime, setLastThrowTime] = useState<number>(0);
+  const [coins, setCoins] = useState<{ x: number; y: number; rotation: number; collected: boolean }[]>([]);
+  const [coinsCollected, setCoinsCollected] = useState<number>(0);
+  const [lastCoinThrowTime, setLastCoinThrowTime] = useState<number>(0);
+  const [savedScores, setSavedScores] = useState<number>(0);
 
   const hitAudioRef = React.createRef<HTMLAudioElement>();
   const victoryAudioRef = React.createRef<HTMLAudioElement>();
+  const coinAudioRef = React.createRef<HTMLAudioElement>();
 
   const logPositions = Array.from({ length: 9 }, (_, i) => ({
     x: 100 + i * 200,
     y: 100,
   }));
 
+  const gameContainerRef = useRef<HTMLDivElement>(null);
+
+  const climberControls = useAnimation();
+
+  const animateClimber = useCallback((position: { x: number; y: number }, options: any) =>
+    climberControls.start({ left: `${position.x}px`, bottom: `${position.y}px`, ...options }), [climberControls]);
+
+  // Вычисляем последнее бревно
+  const lastLog = useMemo(() => 
+    logs.length > 0 ? logs[logs.length - 1] : null
+  , [logs]);
+
   const startGame = useCallback(() => {
+    console.log("Начинаем игру с новой логикой исчезающих бревен");
+
     setStage(Stage.GAME);
-    setClimberPosition({ x: logPositions[0].x, y: logPositions[0].y });
-    setLogs(logPositions);
+    setClimberPosition({ x: 100, y: 100 });
+
+    const initialLogs = logPositions.map((pos, index) => ({
+      ...pos,
+      visible: true
+    }));
+    console.log("Начальные бревна:", initialLogs);
+    setLogs(initialLogs);
+    
     const initialFishes = logPositions.slice(3, -1).map((log, i) => ({
       x: (log.x + logPositions[i + 4].x) / 2,
       y: 150,
       direction: "up" as "up" | "down",
       lastJumpTime: Date.now() + i * 500,
       jumpInterval: 2000 + Math.random() * 2000,
+      isDangerous: Math.random() < 0.3,
     }));
+
+    // Создаем декоративных рыбок в самой верхней части экрана
+    const screenWidth = window.innerWidth || 1000;
+    const screenHeight = window.innerHeight || 600;
+    
+    // Верхняя часть экрана для рыбок (от 5% до 25% высоты экрана)
+    const topYStart = screenHeight * 0.05;
+    const topYEnd = screenHeight * 0.25;
+
+    const initialDecorativeFishes = Array.from({ length: 15 }, (_, i) => ({
+      id: i,
+      x: Math.random() * screenWidth,
+      y: topYStart + Math.random() * (topYEnd - topYStart),
+      direction: Math.random() > 0.5 ? "left" as "left" : "right" as "right",
+      speed: 0.5 + Math.random() * 1.5,  // Разная скорость для каждой рыбки
+      size: 0.6 + Math.random() * 0.8,   // Разный размер для каждой рыбки (от 60% до 140%)
+      color: ['#FF9800', '#E91E63', '#2196F3', '#4CAF50'][Math.floor(Math.random() * 4)], // Разные цвета рыбок
+      isDangerous: Math.random() < 0.2,
+    }));
+
     setFishes(initialFishes);
+    setDecorativeFishes(initialDecorativeFishes);
+    setBoats([]);
+    setBananas([]);
+    setThrowingTime(9);
+    setLastThrowTime(Date.now());
     setScore(0);
     setLives(3);
     setTime(60);
@@ -61,7 +194,10 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
     setIsJumping(false);
     setIsHit(false);
     setIsInvulnerable(false);
-  }, []);
+    
+    // Дополнительная проверка
+    console.log("После установки логов:", initialLogs.length);
+  }, [logPositions]);
 
   const handleStartClick = () => {
     startGame();
@@ -69,9 +205,12 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
 
   const resetGame = useCallback(() => {
     setStage(Stage.START);
-    setClimberPosition({ x: 0, y: 100 });
     setLogs([]);
     setFishes([]);
+    setBoats([]);
+    setBananas([]);
+    setCoins([]);
+    setCoinsCollected(0);
     setScore(0);
     setLives(3);
     setTime(60);
@@ -79,75 +218,52 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
     setIsJumping(false);
     setIsHit(false);
     setIsInvulnerable(false);
+    setThrowingTime(9);
+    setLastThrowTime(0);
   }, []);
 
   const checkCollision = useCallback(() => {
-    if (stage !== Stage.GAME || isHit) {
-      console.log('Проверка отменена:', { stage, isHit });
-      return;
-    }
+    if (stage !== Stage.GAME || isHit) return;
 
-    const currentLog = logs[currentLogIndex];
-    const distanceX = Math.abs(climberPosition.x - currentLog.x);
-    const distanceY = Math.abs(climberPosition.y - currentLog.y);
+const currentLog = logs[currentLogIndex];
+if (!currentLog) return;
 
-    if (!isJumping && (distanceX > 25 || distanceY > 25)) {
-      hitAudioRef.current?.play();
-      setLives(prev => prev - 1);
-      setIsHit(true);
-      setTimeout(() => {
-        setClimberPosition({ x: logs[currentLogIndex].x, y: logs[currentLogIndex].y });
-        setIsHit(false);
-      }, 500);
-    }
+const distanceX = Math.abs(climberPosition.x - currentLog.x);
+const distanceY = Math.abs(climberPosition.y - currentLog.y);
 
-    fishes.forEach((fish) => {
-      const fishDistanceX = Math.abs(fish.x - climberPosition.x);
-      const fishDistanceY = Math.abs(fish.y - climberPosition.y);
-      const isPlayerOnLog = logs[currentLogIndex] && Math.abs(climberPosition.y - logs[currentLogIndex].y) < 10;
-      const isVulnerable = !isPlayerOnLog && !isInvulnerable;
-      const isFishAbovePlayer = fish.y > climberPosition.y;
+if (!isJumping && (distanceX > 25 || distanceY > 25) && currentLog.visible) {
+  hitAudioRef.current?.play();
+  setLives(prev => prev - 1);
+  setIsHit(true);
+  setTimeout(() => {
+    setIsHit(false);
+  }, 500);
+}
 
-      console.log('Проверка столкновения с рыбкой:', {
-        fishX: fish.x,
-        fishY: fish.y,
-        climberX: climberPosition.x,
-        climberY: climberPosition.y,
-        fishDistanceX,
-        fishDistanceY,
-        isJumping,
-        isInvulnerable,
-        isPlayerOnLog,
-        isVulnerable,
-        isFishAbovePlayer,
-        currentLogIndex,
-        lives
-      });
+fishes.forEach((fish) => {
+  const fishDistanceX = Math.abs(fish.x - climberPosition.x);
+  const fishDistanceY = Math.abs(fish.y - climberPosition.y);
+  const isPlayerOnLog = logs[currentLogIndex] && Math.abs(climberPosition.y - logs[currentLogIndex].y) < 10;
+  const isVulnerable = !isPlayerOnLog && !isInvulnerable;
+  const isFishAbovePlayer = fish.y > climberPosition.y;
 
-      if (fishDistanceX <= 50 && fishDistanceY <= 50 && isVulnerable && !isHit && !isFishAbovePlayer) {
-        console.log('Столкновение с рыбкой!');
-        hitAudioRef.current?.play();
-        
-        setLives(prev => {
-          const newLives = Math.max(0, prev - 1);
-          console.log('Жизни уменьшены:', { было: prev, стало: newLives });
-          if (newLives <= 0) {
-            console.log('Игра окончена - нет жизней');
-            setStage(Stage.FINISH);
-          }
-          return newLives;
-        });
-        
-        setIsHit(true);
-        setIsInvulnerable(true);
-        
-        setTimeout(() => {
-          console.log('Сброс состояния после попадания');
-          setIsHit(false);
-          setIsInvulnerable(false);
-        }, 2000);
+  if (fishDistanceX <= 50 && fishDistanceY <= 50 && isVulnerable && !isHit && !isFishAbovePlayer) {
+    hitAudioRef.current?.play();
+    setLives(prev => {
+      const newLives = Math.max(0, prev - 1);
+      if (newLives <= 0) {
+        setStage(Stage.FINISH);
       }
+      return newLives;
     });
+    setIsHit(true);
+    setIsInvulnerable(true);
+    setTimeout(() => {
+      setIsHit(false);
+      setIsInvulnerable(false);
+    }, 2000);
+  }
+});
   }, [stage, climberPosition, logs, currentLogIndex, fishes, isJumping, isHit, isInvulnerable, hitAudioRef]);
 
   const moveFishes = useCallback(() => {
@@ -164,99 +280,416 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
           };
         }
 
-        const jumpTime = currentTime - fish.lastJumpTime;
-        
-        if (jumpTime < fish.jumpInterval / 2) {
-          const newY = fish.direction === "up" ? fish.y + 4 : fish.y;
-          const newDirection = newY >= 250 ? "down" : fish.direction;
-          return { ...fish, y: newY, direction: newDirection };
-        } else {
-          const newY = fish.direction === "down" ? fish.y - 2 : fish.y;
-          const newDirection = newY <= 150 ? "up" : fish.direction;
-          return { ...fish, y: newY, direction: newDirection };
-        }
-      })
-    );
+    const jumpTime = currentTime - fish.lastJumpTime;
+    
+    if (jumpTime < fish.jumpInterval / 2) {
+      const newY = fish.direction === "up" ? fish.y + 4 : fish.y;
+      const newDirection = newY >= 250 ? "down" : fish.direction;
+      return { ...fish, y: newY, direction: newDirection };
+    } else {
+      const newY = fish.direction === "down" ? fish.y - 2 : fish.y;
+      const newDirection = newY <= 150 ? "up" : fish.direction;
+      return { ...fish, y: newY, direction: newDirection };
+    }
+  })
+);
   }, []);
+
+  const moveBoats = useCallback(() => {
+    setBoats(prev => prev.map(boat => {
+      let newX = boat.x + boat.direction * 3;
+      let newDirection = boat.direction;
+      if (newX > window.innerWidth - 100) {
+        newDirection = -1;
+        newX = window.innerWidth - 100;
+      } else if (newX < 100) {
+        newDirection = 1;
+        newX = 100;
+      }
+      return { ...boat, x: newX, direction: newDirection };
+    }));
+  }, []);
+
+  // Функция для перемещения декоративных рыбок
+  const moveDecorativeFishes = useCallback(() => {
+    const screenWidth = window.innerWidth || 1000;
+    
+    setDecorativeFishes(prev => prev.map(fish => {
+      // Вычисляем новую позицию в зависимости от направления и скорости
+      let newX = fish.direction === "right" 
+        ? fish.x + fish.speed 
+        : fish.x - fish.speed;
+      
+      // Меняем направление, если рыбка достигла края экрана
+      let newDirection = fish.direction;
+      
+      // Добавляем небольшую случайность для изменения направления
+      if (Math.random() < 0.005) {
+        newDirection = fish.direction === "left" ? "right" : "left";
+      }
+      
+      // Проверяем, достигла ли рыбка края экрана
+      if (newX > screenWidth + 50) {
+        newX = -50; // Телепортируем на другую сторону экрана
+      } else if (newX < -50) {
+        newX = screenWidth + 50;
+      }
+      
+      // Добавляем небольшое случайное движение по вертикали
+      let newY = fish.y + (Math.random() * 2 - 1);
+      
+      // Ограничиваем движение по вертикали в самой верхней части экрана
+      const topYStart = (window.innerHeight || 600) * 0.05;
+      const topYEnd = (window.innerHeight || 600) * 0.25;
+      
+      newY = Math.max(topYStart, Math.min(topYEnd, newY));
+      
+      return {
+        ...fish,
+        x: newX,
+        y: newY,
+        direction: newDirection
+      };
+    }));
+  }, []);
+
+  const throwCoins = useCallback(() => {
+    const currentTime = Date.now();
+    const timeSinceLastThrow = (currentTime - lastCoinThrowTime) / 1000;
+    const MAX_COINS = 19; // Максимальное количество монет
+
+    // Логируем количество монет (для отладки)
+    if (coins.length >= MAX_COINS) {
+      console.log(`Достигнуто максимальное количество монет (${coins.length}/${MAX_COINS})`);
+    }
+
+    // Обновляем позиции существующих монет
+    setCoins(prev => {
+      // Проверяем, не превышает ли количество монет максимальное значение
+      // Если превышает, удаляем самые старые (те, что внизу экрана)
+      let movedCoins = prev.map(coin => ({
+        ...coin,
+        y: coin.y + (8 + Math.random() * 5) // Случайная скорость падения от 8 до 13
+      }));
+      
+      // Отфильтровываем монеты за пределами экрана и собранные монеты
+      movedCoins = movedCoins.filter(coin => coin.y < window.innerHeight && !coin.collected);
+      
+      // Если монет все еще слишком много, оставляем только MAX_COINS, сортируя по y (удаляем нижние)
+      if (movedCoins.length > MAX_COINS) {
+        movedCoins.sort((a, b) => a.y - b.y); // Сортируем по возрастанию y (сверху вниз)
+        movedCoins = movedCoins.slice(0, MAX_COINS); // Оставляем только верхние монеты
+      }
+      
+      return movedCoins;
+    });
+
+    // Создаем новые монеты каждые 1.5 секунды, если на экране меньше 19 монет
+    if (timeSinceLastThrow >= 1.5 && coins.length < MAX_COINS) { // Уменьшаем время с 3 до 1.5 секунд
+      setLastCoinThrowTime(currentTime);
+      
+      setCoins(prevCoins => {
+        const newCoins = [...prevCoins];
+        
+        // Определяем, сколько можем добавить монет, чтобы не превысить MAX_COINS
+        const coinsToAdd = Math.min(8, MAX_COINS - newCoins.length); // Увеличиваем с 5 до 8
+        
+        // Добавляем только нужное количество монет равномерно по экрану
+        for (let i = 0; i < coinsToAdd; i++) {
+          // Вместо использования позиций бревен, выбираем случайную позицию по ширине экрана
+          const screenWidth = window.innerWidth || 1000;
+          
+          newCoins.push({
+            x: 100 + Math.random() * (screenWidth - 200), // Отступаем от краев по 100px
+            y: -50 - Math.random() * 100, // Разный начальный уровень по Y
+            rotation: 0,
+            collected: false
+          });
+        }
+        
+        return newCoins;
+      });
+    }
+  }, [logs, lastCoinThrowTime, coins.length]);
+
+  const checkCoinCollection = useCallback(() => {
+    if (stage !== Stage.GAME) return;
+
+    let collectedCount = 0;
+
+    setCoins(prev => {
+      const newCoins = prev.map(coin => {
+        if (coin.collected) return coin;
+
+        // Расчет расстояния между монетой и альпинистом
+        const distanceX = Math.abs(coin.x - climberPosition.x);
+        const distanceY = Math.abs(coin.y - climberPosition.y);
+        const collisionDistance = 25; // Уменьшенный радиус столкновения для более точного касания
+
+        if (distanceX < collisionDistance && distanceY < collisionDistance) {
+          // Немедленное воспроизведение звука при касании
+          if (coinAudioRef.current) {
+            const coinSoundClone = new Audio(coinSound);
+            coinSoundClone.volume = 0.5;
+            coinSoundClone.play().catch(err => {
+              console.log("Ошибка воспроизведения звука монеты:", err);
+              coinAudioRef.current?.play().catch(e => 
+                console.log("Не удалось воспроизвести звук:", e)
+              );
+            });
+          }
+          
+          collectedCount++;
+          return { ...coin, collected: true };
+        }
+        return coin;
+      });
+
+      // Обновляем счетчик и очки немедленно
+      if (collectedCount > 0) {
+        setCoinsCollected(prev => prev + collectedCount);
+        setScore(prev => prev + collectedCount * 20);
+      }
+
+      // Фильтруем только несобранные монеты
+      return newCoins;
+    });
+  }, [stage, climberPosition, coinAudioRef, coinSound]);
+
+  // Функция для проверки столкновения с опасными рыбками
+  const checkDangerousFishCollision = useCallback(() => {
+    if (stage !== Stage.GAME || isHit || isInvulnerable) return;
+
+    // Проверяем опасных рыбок в воде
+    fishes.forEach((fish) => {
+      if (fish.isDangerous && 
+        Math.abs(climberPosition.x - fish.x) < 30 && 
+        Math.abs(climberPosition.y - fish.y) < 30) {
+        // Столкновение с опасной рыбкой
+        hitAudioRef.current?.play();
+        setIsHit(true);
+        setIsInvulnerable(true);
+        
+        // Уменьшаем жизни
+        setLives(prev => Math.max(0, prev - 1));
+
+        // Сбрасываем состояние попадания через 1 секунду
+        setTimeout(() => setIsHit(false), 1000);
+        
+        // Сбрасываем неуязвимость через 1 секунду после окончания состояния попадания
+        setTimeout(() => setIsInvulnerable(false), 2000);
+      }
+    });
+
+    // Проверяем декоративных опасных рыбок
+    decorativeFishes.forEach((fish) => {
+      if (fish.isDangerous && 
+        Math.abs(climberPosition.x - fish.x) < 30 && 
+        Math.abs(climberPosition.y - fish.y) < 40) {
+        // Столкновение с опасной рыбкой-декорацией
+        hitAudioRef.current?.play();
+        setIsHit(true);
+        setIsInvulnerable(true);
+        
+        // Уменьшаем жизни
+        setLives(prev => Math.max(0, prev - 1));
+
+        // Сбрасываем состояние попадания через 1 секунду
+        setTimeout(() => setIsHit(false), 1000);
+        
+        // Сбрасываем неуязвимость через 1 секунду после окончания состояния попадания
+        setTimeout(() => setIsInvulnerable(false), 2000);
+      }
+    });
+  }, [stage, isHit, isInvulnerable, fishes, decorativeFishes, climberPosition.x, climberPosition.y]);
+
+  useEffect(() => {
+    if (stage !== Stage.GAME || isPaused) return;
+
+    const interval = setInterval(() => {
+      moveFishes();
+      moveBoats();
+      moveDecorativeFishes(); 
+      checkCollision();
+      throwCoins();
+      checkCoinCollection(); 
+      checkDangerousFishCollision(); 
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [stage, moveFishes, moveBoats, moveDecorativeFishes, checkCollision, throwCoins, checkCoinCollection, checkDangerousFishCollision, isPaused]);
+
+  // Обновляем варианты анимации для монет
+  const coinVariants = {
+    initial: { scale: 1, opacity: 1 },
+    collected: {
+      scale: [1, 1.3, 0], // Более плавное увеличение перед исчезновением
+      opacity: [1, 1, 0],
+      y: -15, // Небольшой подъем при сборе
+      transition: { 
+        duration: 0.25, // Ускоряем анимацию исчезновения
+        ease: "easeOut"
+      }
+    }
+  };
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (stage !== Stage.GAME || isJumping || isHit) return;
+      if (stage !== Stage.GAME) return;
+
+      if (event.key === "Escape") {
+        // Обработка паузы будет происходить в PauseContext
+        return;
+      }
+
+      if (isPaused || isJumping || isHit) return;
 
       if (event.key === "ArrowRight" || event.key === "d") {
         if (currentLogIndex < logs.length - 1) {
-          setIsJumping(true);
           const nextLog = logs[currentLogIndex + 1];
-          setClimberPosition({ x: nextLog.x, y: nextLog.y + 100 });
-          setTimeout(() => {
-            setClimberPosition({ x: nextLog.x, y: nextLog.y });
-            setCurrentLogIndex(prev => prev + 1);
-            setScore(prev => prev + 10);
-            setIsJumping(false);
-          }, 300);
+          if (nextLog.visible) {
+            setIsJumping(true);
+            
+            // Используем setTimeout вместо цепочки обещаний
+            setTimeout(() => {
+              setClimberPosition({ x: nextLog.x, y: nextLog.y });
+              setCurrentLogIndex(prev => prev + 1);
+              setScore(prev => prev + 10);
+              
+              setTimeout(() => {
+                setIsJumping(false);
+              }, 600); // Длительность анимации прыжка
+            }, 300); // Задержка перед перемещением
+          } else {
+            hitAudioRef.current?.play();
+            setLives(prev => {
+              const newLives = Math.max(0, prev - 1);
+              if (newLives <= 0) {
+                setStage(Stage.FINISH);
+              }
+              return newLives;
+            });
+            setIsHit(true);
+            
+            setTimeout(() => {
+              setIsHit(false);
+            }, 500); // Длительность анимации удара
+          }
         }
       } else if (event.key === "ArrowLeft" || event.key === "a") {
         if (currentLogIndex > 0) {
-          setIsJumping(true);
           const prevLog = logs[currentLogIndex - 1];
-          setClimberPosition({ x: prevLog.x, y: prevLog.y + 100 });
-          setTimeout(() => {
-            setClimberPosition({ x: prevLog.x, y: prevLog.y });
-            setCurrentLogIndex(prev => prev - 1);
-            setIsJumping(false);
-          }, 300);
+          if (prevLog.visible) {
+            setIsJumping(true);
+            
+            // Используем setTimeout вместо цепочки обещаний
+            setTimeout(() => {
+              setClimberPosition({ x: prevLog.x, y: prevLog.y });
+              setCurrentLogIndex(prev => prev - 1);
+              
+              setTimeout(() => {
+                setIsJumping(false);
+              }, 600); // Длительность анимации прыжка
+            }, 300); // Задержка перед перемещением
+          } else {
+            hitAudioRef.current?.play();
+            setLives(prev => {
+              const newLives = Math.max(0, prev - 1);
+              if (newLives <= 0) {
+                setStage(Stage.FINISH);
+              }
+              return newLives;
+            });
+            setIsHit(true);
+            
+            setTimeout(() => {
+              setIsHit(false);
+            }, 500); // Длительность анимации удара
+          }
         }
       }
     },
-    [stage, currentLogIndex, logs, isJumping, isHit]
+    [stage, currentLogIndex, logs, isJumping, isHit, isPaused, hitAudioRef]
   );
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout | undefined;
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (stage !== Stage.GAME || isJumping || isHit || isPaused) return;
 
-    if (stage === Stage.GAME) {
-      interval = setInterval(() => {
-        moveFishes();
-        checkCollision();
-      }, 100);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
+    const startX = e.touches[0].clientX;
+    const handleTouchEnd = (endE: TouchEvent) => {
+      const endX = endE.changedTouches[0].clientX;
+      if (endX - startX > 50) {
+        handleKeyDown({ key: "ArrowRight" } as React.KeyboardEvent<HTMLDivElement>);
+      } else if (startX - endX > 50) {
+        handleKeyDown({ key: "ArrowLeft" } as React.KeyboardEvent<HTMLDivElement>);
+      }
+      document.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [stage, moveFishes, checkCollision]);
+    document.addEventListener("touchend", handleTouchEnd);
+  }, [stage, isJumping, isHit, isPaused, handleKeyDown]);
+
+  useEffect(() => {
+    if (stage !== Stage.GAME || isPaused) return;
+
+const disappearingLogIndices = [2, 4, 6];
+
+const logCycleInterval = setInterval(() => {
+  setLogs(prevLogs => {
+    const newLogs = [...prevLogs];
+    disappearingLogIndices.forEach(index => {
+      if (newLogs[index]) {
+        newLogs[index] = { ...newLogs[index], visible: !newLogs[index].visible };
+      }
+    });
+
+    if (
+      disappearingLogIndices.includes(currentLogIndex) && 
+      !newLogs[currentLogIndex].visible && 
+      !isJumping
+    ) {
+      hitAudioRef.current?.play();
+      setLives(prev => {
+        const newLives = Math.max(0, prev - 1);
+        if (newLives <= 0) {
+          setStage(Stage.FINISH);
+        }
+        return newLives;
+      });
+      setIsHit(true);
+      setTimeout(() => {
+        const safeLogIndex = Math.max(0, currentLogIndex - 1);
+        setCurrentLogIndex(safeLogIndex);
+        setIsHit(false);
+      }, 500);
+    }
+    
+    return newLogs;
+  });
+}, 3000);
+
+return () => clearInterval(logCycleInterval);
+  }, [stage, isPaused, currentLogIndex, isJumping, hitAudioRef]);
 
   useEffect(() => {
     let timerInterval: NodeJS.Timeout | undefined;
 
-    if (stage === Stage.GAME && time > 0) {
-      timerInterval = setInterval(() => {
-        setTime(prev => prev - 1);
-      }, 1000);
-    }
+if (stage === Stage.GAME && time > 0 && !isPaused) {
+  timerInterval = setInterval(() => {
+    setTime(prev => prev - 1);
+  }, 1000);
+}
 
-    if (time === 0 || lives === 0) {
-      setStage(Stage.FINISH);
-      setTimeout(() => {
-        resetGame(); // Только сброс игры при проигрыше
-      }, 3000);
-    }
+if (time === 0 || lives === 0) {
+  setStage(Stage.FINISH);
+  setTimeout(() => {
+    resetGame();
+  }, 3000);
+}
 
-    return () => {
-      if (timerInterval) clearInterval(timerInterval);
-    };
-  }, [stage, time, lives, resetGame]);
-
-  useEffect(() => {
-    if (stage === Stage.GAME && currentLogIndex === logs.length - 1) {
-      setBearCelebrating(true);
-      setStage(Stage.FINISH);
-      victoryAudioRef.current?.play();
-      setTimeout(() => {
-        onComplete?.(); // Переход на следующий уровень при победе
-      }, 3000);
-    }
-  }, [stage, currentLogIndex, logs.length, onComplete]);
+return () => {
+  if (timerInterval) clearInterval(timerInterval);
+};
+  }, [stage, time, lives, resetGame, isPaused]);
 
   useEffect(() => {
     if (stage === Stage.GAME && lives <= 1) {
@@ -269,485 +702,780 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }) => {
 
   useEffect(() => {
     if (stage === Stage.GAME) {
-      audio.loop = true;
-      audio.volume = 0.3;
-      audio.play();
+      if (isPaused) {
+        audio.pause();
+      } else {
+        audio.loop = true;
+        audio.volume = 0.3;
+        audio.play().catch(() => {});
+      }
     } else {
       audio.pause();
       audio.currentTime = 0;
     }
-    return () => {
-      audio.pause();
-      audio.currentTime = 0;
+
+return () => {
+  audio.pause();
+  audio.currentTime = 0;
+};
+  }, [stage, audio, isPaused]);
+
+  useEffect(() => {
+    if (stage === Stage.GAME && !isPaused && gameContainerRef.current) {
+      gameContainerRef.current.focus();
+    }
+  }, [stage, isPaused]);
+
+  useEffect(() => {
+    if (stage !== Stage.GAME || isPaused || throwingTime <= 0) return;
+
+const bananaTimer = setInterval(() => {
+  setThrowingTime(prev => prev - 1);
+}, 1000);
+
+return () => clearInterval(bananaTimer);
+  }, [stage, isPaused, throwingTime]);
+
+  useEffect(() => {
+    if (stage === Stage.GAME && coinsCollected >= 9 && currentLogIndex === logs.length - 1) {
+      console.log("Условие победы выполнено:", { coinsCollected, currentLogIndex, logLength: logs.length });
+      setBearCelebrating(true);
+      setStage(Stage.FINISH);
+      victoryAudioRef.current?.play();
+      setTimeout(() => {
+        onComplete?.();
+      }, 3000);
+    }
+  }, [stage, coinsCollected, currentLogIndex, logs.length, onComplete]);
+
+  useEffect(() => {
+    const savedHighScore = localStorage.getItem('boatGameHighScore');
+    if (savedHighScore) {
+      setSavedScores(parseInt(savedHighScore));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('boatGameHighScore', savedScores.toString());
+  }, [savedScores]);
+
+  // Инициализация аудио
+  useEffect(() => {
+    // Функция для предзагрузки и инициализации аудио
+    const initAudio = () => {
+      // Загружаем все звуки при первом взаимодействии пользователя
+      if (hitAudioRef.current) {
+        hitAudioRef.current.load();
+        hitAudioRef.current.volume = 0.5;
+      }
+      
+      if (victoryAudioRef.current) {
+        victoryAudioRef.current.load();
+        victoryAudioRef.current.volume = 0.5;
+      }
+      
+      if (coinAudioRef.current) {
+        coinAudioRef.current.load();
+        coinAudioRef.current.volume = 0.5;
+      }
+      
+      console.log("Аудио инициализировано");
     };
-  }, [stage, audio]);
+
+    // Инициализируем звуки
+    initAudio();
+    
+    // Также добавляем обработку событий для мобильных устройств
+    const handleUserInteraction = () => {
+      initAudio();
+      // Удаляем обработчики после первого взаимодействия
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+    };
+    
+    window.addEventListener('click', handleUserInteraction);
+    window.addEventListener('touchstart', handleUserInteraction);
+    
+    return () => {
+      window.removeEventListener('click', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, [hitAudioRef, victoryAudioRef, coinAudioRef]);
+
+  // Добавляем стили в начало файла после импортов
+  const styles = `
+    .start-page {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(180deg, #87CEEB 0%, #1E90FF 100%);
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .game-title {
+      font-size: 48px;
+      margin-bottom: 30px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .scores {
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #FFD700;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    .instructions {
+      margin-bottom: 30px;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    .instructions p {
+      margin: 10px 0;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+    }
+
+    .start-button {
+      padding: 15px 30px;
+      font-size: 24px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+    }
+
+    .start-button:hover {
+      background: #45a049;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .floating-snowflakes {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .start-snowflake {
+      position: absolute;
+      font-size: 24px;
+      pointer-events: none;
+      z-index: 2;
+    }
+    
+    /* Стили для медвежонка */
+    .bear {
+      position: absolute;
+      width: 80px;
+      height: 100px;
+      z-index: 10;
+    }
+    
+    /* Голова медвежонка */
+    .bear::before {
+      content: '';
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      background: #8B4513;
+      border-radius: 50%;
+      top: 10px;
+      left: 10px;
+    }
+    
+    /* Тело медвежонка */
+    .bear::after {
+      content: '';
+      position: absolute;
+      width: 50px;
+      height: 60px;
+      background: #8B4513;
+      border-radius: 25px;
+      bottom: 0;
+      left: 15px;
+    }
+    
+    /* Лапы медвежонка */
+    .bear-paws::before,
+    .bear-paws::after {
+      content: '';
+      position: absolute;
+      width: 15px;
+      height: 20px;
+      background: #8B4513;
+      border-radius: 8px;
+      bottom: 5px;
+    }
+    
+    .bear-paws::before {
+      left: 8px;
+      transform: rotate(-10deg);
+    }
+    
+    .bear-paws::after {
+      right: 8px;
+      transform: rotate(10deg);
+    }
+    
+    /* Верхние лапы (руки) */
+    .bear-arms::before,
+    .bear-arms::after {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 25px;
+      background: #8B4513;
+      border-radius: 6px;
+      top: 35px;
+    }
+    
+    .bear-arms::before {
+      left: 5px;
+      transform: rotate(15deg);
+    }
+    
+    .bear-arms::after {
+      right: 5px;
+      transform: rotate(-15deg);
+    }
+    
+    /* Анимация плавания лапами */
+    @keyframes swimPaws {
+      0%, 100% { transform: rotate(-10deg); }
+      50% { transform: rotate(10deg); }
+    }
+    
+    @keyframes swimArms {
+      0%, 100% { transform: rotate(15deg); }
+      50% { transform: rotate(30deg); }
+    }
+    
+    .bear-paws::before {
+      animation: swimPaws 1.5s ease-in-out infinite;
+    }
+    
+    .bear-paws::after {
+      animation: swimPaws 1.5s ease-in-out infinite reverse;
+    }
+    
+    .bear-arms::before {
+      animation: swimArms 1.5s ease-in-out infinite;
+    }
+    
+    .bear-arms::after {
+      animation: swimArms 1.5s ease-in-out infinite reverse;
+    }
+    
+    /* Уши */
+    .bear-ears::before,
+    .bear-ears::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: #8B4513;
+      border-radius: 50%;
+      top: 5px;
+    }
+    
+    .bear-ears::before {
+      left: 15px;
+    }
+    
+    .bear-ears::after {
+      right: 15px;
+    }
+    
+    /* Маска для плавания */
+    .bear-mask {
+      position: absolute;
+      width: 50px;
+      height: 30px;
+      background: #00CED1;
+      border: 3px solid #008B8B;
+      border-radius: 15px;
+      top: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+    
+    /* Стекла маски */
+    .bear-mask::before,
+    .bear-mask::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: rgba(255, 255, 255, 0.6);
+      border: 2px solid #008B8B;
+      border-radius: 50%;
+      top: 4px;
+    }
+    
+    .bear-mask::before {
+      left: 4px;
+    }
+    
+    .bear-mask::after {
+      right: 4px;
+    }
+    
+    /* Мордочка медвежонка */
+    .bear-face {
+      position: absolute;
+      width: 40px;
+      height: 30px;
+      background: #D2B48C;
+      border-radius: 50%;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1;
+    }
+    
+    /* Глаза медвежонка */
+    .bear-face::before,
+    .bear-face::after {
+      content: '';
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #000;
+      border-radius: 50%;
+      top: 10px;
+    }
+    
+    .bear-face::before {
+      left: 10px;
+    }
+    
+    .bear-face::after {
+      right: 10px;
+    }
+    
+    /* Нос */
+    .bear-nose {
+      position: absolute;
+      width: 12px;
+      height: 8px;
+      background: #000;
+      border-radius: 50%;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+    }
+    
+    /* Трубка */
+    .bear-snorkel {
+      position: absolute;
+      width: 8px;
+      height: 40px;
+      background: #FF6B6B;
+      border-radius: 4px;
+      top: 10px;
+      right: 15px;
+      transform: rotate(-15deg);
+    }
+    
+    /* Загубник трубки */
+    .bear-snorkel::after {
+      content: '';
+      position: absolute;
+      width: 15px;
+      height: 8px;
+      background: #FF6B6B;
+      border-radius: 4px;
+      bottom: -2px;
+      left: -3px;
+      transform: rotate(15deg);
+    }
+    
+    /* Пузырьки */
+    @keyframes bubble {
+      0% {
+        transform: translateY(0) scale(1);
+        opacity: 0;
+      }
+      50% {
+        transform: translateY(-20px) scale(1.2);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(-40px) scale(1);
+        opacity: 0;
+      }
+    }
+    
+    .bear-bubbles::before,
+    .bear-bubbles::after {
+      content: '○';
+      position: absolute;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 12px;
+      animation: bubble 2s infinite;
+      top: 5px;
+      right: 15px;
+    }
+    
+    .bear-bubbles::after {
+      top: -10px;
+      right: 5px;
+      animation-delay: 1s;
+    }
+  `;
+
+  // Добавляем мониторинг изменений в массиве logs
+  useEffect(() => {
+    console.log("Массив logs изменился:", { 
+      logsLength: logs.length, 
+      lastLog: logs.length > 0 ? logs[logs.length - 1] : null 
+    });
+  }, [logs]);
 
   return (
-    <>
-      <style>
-        {`
-          @keyframes bubbleRise {
-            0% { transform: translateY(0); opacity: 0.8; }
-            100% { transform: translateY(-30px); opacity: 0; }
-          }
-          
-          @keyframes bearJump {
-            0% { transform: translateY(0) translateX(-50%); }
-            40% { transform: translateY(-15px) translateX(-50%); }
-            60% { transform: translateY(-15px) translateX(-50%); }
-            100% { transform: translateY(0) translateX(-50%); }
-          }
-          
-          @keyframes finsFlap {
-            0% { transform: rotate(-10deg); }
-            50% { transform: rotate(-30deg); }
-            100% { transform: rotate(-10deg); }
-          }
-          
-          @keyframes finsFlipRight {
-            0% { transform: rotate(10deg); }
-            50% { transform: rotate(30deg); }
-            100% { transform: rotate(10deg); }
-          }
-          
-          @keyframes celebrateWave {
-            0% { transform: rotate(-25deg); }
-            50% { transform: rotate(-45deg); }
-            100% { transform: rotate(-25deg); }
-          }
-          
-          @keyframes celebrateWaveRight {
-            0% { transform: rotate(25deg); }
-            50% { transform: rotate(45deg); }
-            100% { transform: rotate(25deg); }
-          }
-          
-          @keyframes moreBubbles {
-            0% { transform: translateY(0); opacity: 0.9; }
-            100% { transform: translateY(-40px); opacity: 0; }
-          }
-        `}
-      </style>
-      <audio ref={hitAudioRef} src={hitSound} preload="auto"></audio>
-      <audio ref={victoryAudioRef} src={victorySound} preload="auto"></audio>
-      {stage === Stage.START ? (
-        <div className="start-page">
-          <h1 className="game-title">Прыжки по бревнам</h1>
-          <button className="start-button" onClick={handleStartClick}>
-            Начать игру
-          </button>
-        </div>
-      ) : (
-        <div
-          className="wrapper"
-          tabIndex={0}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          style={{ outline: "none" }}
-        >
-          <div className="sun-container" style={{ top: "20px", right: "100px" }}>
-            <div className="sun" />
-            {Array.from({ length: 12 }).map((_, index) => (
-              <div
-                key={index}
-                className="sun-ray"
-                style={{
-                  transform: `rotate(${index * 30}deg)`,
-                  animation: `ray-pulse 2s infinite alternate ${index * 0.2}s`,
-                }}
-              />
-            ))}
-          </div>
-          
-          <div className="river-container">
-            <div className="water-layer" style={{
-              position: "absolute",
-              bottom: "80px",
-              left: "0",
-              width: "100%",
-              height: "120px",
-              background: "linear-gradient(to bottom, #4facfe 0%, #00f2fe 100%)",
-              opacity: 0.8,
-              zIndex: 1,
-              borderRadius: "5px",
-              overflow: "hidden"
-            }}>
-              {Array.from({ length: 20 }).map((_, i) => (
-                <div 
-                  key={i} 
-                  style={{
-                    position: "absolute",
-                    bottom: `${10 + (i % 3) * 10}px`,
-                    left: `${i * 50}px`,
-                    width: "100px",
-                    height: "20px",
-                    borderRadius: "50%",
-                    background: "rgba(255, 255, 255, 0.3)",
-                    animation: `wave ${2 + (i % 3)}s ease-in-out infinite alternate-reverse ${i * 0.1}s`
+    <div className="boat-game-container">
+      <style>{styles}</style>
+      <audio ref={hitAudioRef} src={hitSound} preload="auto" />
+      <audio ref={victoryAudioRef} src={victorySound} preload="auto" />
+      <audio ref={coinAudioRef} src={coinSound} preload="auto" />
+      {stage === Stage.START && (
+        <StartScreen
+          onStart={handleStartClick}
+          savedScores={savedScores}
+        />
+      )}
+      {stage === Stage.GAME && (
+        <>
+          <div 
+            className="game-container" 
+            ref={gameContainerRef}
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
+            style={{ outline: 'none' }}
+          >
+            {/* Экран паузы */}
+            {isPaused && (
+              <motion.div 
+                className="pause-screen"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <motion.h1
+                  animate={{
+                    scale: [1, 1.1, 1],
+                    transition: {
+                      repeat: Infinity,
+                      duration: 1.5
+                    }
                   }}
-                />
-              ))}
-              {fishes.map((fish, index) => (
-                fish.direction === "up" && fish.y > 180 && fish.y < 190 && (
-                  <div 
-                    key={`splash-up-${index}`} 
-                    style={{
-                      position: "absolute",
-                      bottom: "110px",
-                      left: `${fish.x - 15}px`,
-                      width: "70px",
-                      height: "20px",
-                      background: "rgba(255, 255, 255, 0.7)",
-                      borderRadius: "50%",
-                      transform: "scale(1, 0.4)",
-                      zIndex: 3,
-                      animation: "splash 0.5s forwards"
-                    }}
-                  />
-                )
-              ))}
-              {fishes.map((fish, index) => (
-                fish.direction === "down" && fish.y > 150 && fish.y < 160 && (
-                  <div 
-                    key={`splash-down-${index}`} 
-                    style={{
-                      position: "absolute",
-                      bottom: "110px",
-                      left: `${fish.x - 15}px`,
-                      width: "70px", 
-                      height: "15px",
-                      background: "rgba(255, 255, 255, 0.6)",
-                      borderRadius: "50%",
-                      transform: "scale(1, 0.3)",
-                      zIndex: 3,
-                      animation: "splash 0.4s forwards"
-                    }}
-                  />
-                )
-              ))}
-            </div>
+                >
+                  ПАУЗА
+                </motion.h1>
+              </motion.div>
+            )}
             
+            {/* Элементы интерфейса - жизни, время, счетчик монет и очков */}
+            <motion.div
+              className="ui-container"
+              style={{
+                position: "absolute",
+                top: "20px",
+                left: "20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+                zIndex: 10
+              }}
+            >
+              <div style={{ display: "flex", gap: "20px" }}>
+                <motion.div
+                  className="lives-container"
+                  style={{
+                    display: "flex",
+                    alignItems: "center", 
+                    background: "rgba(0,0,0,0.5)",
+                    padding: "10px",
+                    borderRadius: "10px",
+                    color: "white"
+                  }}
+                  animate={{
+                    scale: lives === 1 ? [1, 1.2, 1] : 1,
+                    color: lives === 1 ? ["#fff", "#ff0000", "#fff"] : "#fff",
+                    transition: {
+                      repeat: lives === 1 ? Infinity : 0,
+                      duration: 1
+                    }
+                  }}
+                >
+                  <span style={{ marginRight: "5px", fontSize: "18px" }}>Жизни:</span>
+                  {Array.from({ length: lives }).map((_, i) => (
+                    <span key={i} style={{ fontSize: "24px", color: "red" }}>❤️</span>
+                  ))}
+                </motion.div>
+
+                <motion.div
+                  className="time-container"
+                  style={{
+                    background: "rgba(0,0,0,0.5)",
+                    padding: "10px",
+                    borderRadius: "10px",
+                    color: "white",
+                    fontSize: "18px"
+                  }}
+                  animate={{
+                    scale: time <= 10 ? [1, 1.2, 1] : 1,
+                    color: time <= 10 ? ["#fff", "#ff0000", "#fff"] : "#fff",
+                    transition: {
+                      repeat: time <= 10 ? Infinity : 0,
+                      duration: 0.5
+                    }
+                  }}
+                >
+                  Время: {time}
+                </motion.div>
+              </div>
+
+              <div style={{ display: "flex", gap: "20px" }}>
+                <motion.div
+                  className="coins-collected"
+                  style={{
+                    background: "rgba(0,0,0,0.5)",
+                    padding: "10px",
+                    borderRadius: "10px",
+                    color: "white",
+                    fontSize: "18px",
+                    display: "flex",
+                    alignItems: "center"
+                  }}
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    transition: {
+                      duration: 0.5,
+                      repeat: 0
+                    }
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                >
+                  <span style={{ marginRight: "5px" }}>Монеты:</span>
+                  <span style={{ color: "#FFD700", fontWeight: "bold" }}>{coinsCollected}</span>
+                  <span style={{ marginLeft: "5px", fontSize: "20px", color: "#FFD700" }}>🪙</span>
+                </motion.div>
+
+                <motion.div
+                  className="score-display"
+                  style={{
+                    background: "rgba(0,0,0,0.5)",
+                    padding: "10px",
+                    borderRadius: "10px",
+                    color: "white",
+                    fontSize: "18px",
+                    display: "flex",
+                    alignItems: "center"
+                  }}
+                  animate={{
+                    scale: score % 50 === 0 && score > 0 ? [1, 1.2, 1] : 1,
+                    transition: {
+                      duration: 0.5
+                    }
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                >
+                  <span style={{ marginRight: "5px" }}>Счет:</span>
+                  <span style={{ color: "#87CEEB", fontWeight: "bold" }}>{score}</span>
+                </motion.div>
+              </div>
+            </motion.div>
+            
+            {/* Бревна */}
             {logs.map((log, index) => (
-              <div
-                key={index}
+              <motion.div
+                key={`log-${index}`}
                 className="log"
                 style={{
                   left: `${log.x}px`,
                   bottom: `${log.y}px`,
-                  zIndex: 2
+                  opacity: log.visible ? 1 : 0
                 }}
+                animate={{ opacity: log.visible ? 1 : 0 }}
+                transition={{ duration: 0.3 }}
               />
             ))}
-            {fishes.map((fish, index) => (
-              <div
-                key={index}
-                className={`fish ${fish.direction}`}
-                style={{
-                  left: `${fish.x}px`,
-                  bottom: `${fish.y}px`,
-                  zIndex: 3
-                }}
-              />
-            ))}
-            <div
-              className={`climber ${isJumping ? "jumping" : ""} ${isHit ? "hit" : ""} ${isInvulnerable ? "invulnerable" : ""}`}
+
+            {/* Альпинист */}
+            <motion.div
+              className={`climber ${isJumping ? 'jumping' : ''}`}
               style={{
                 left: `${climberPosition.x}px`,
-                bottom: `${climberPosition.y}px`,
-                opacity: isInvulnerable ? 0.5 : 1,
-                zIndex: 4
+                bottom: `${climberPosition.y}px`
               }}
+              animate={
+                isHit 
+                  ? "hit" 
+                  : isJumping 
+                    ? "jumping" 
+                    : "idle"
+              }
+              variants={climberVariants}
+              initial="idle"
             />
-            <div className="finish-line" style={{ left: `${logPositions[8].x + 50}px`, bottom: "150px" }}>
-              🚩
-            </div>
-            
-            {/* Медвежонок в подводной маске и трубке возле финишного флага */}
-            {logs.length > 0 && (
-              <div 
+
+            {/* Монеты */}
+            <AnimatePresence>
+              {coins.map((coin, index) => (
+                <motion.div
+                  key={`coin-${index}`}
+                  className="coin"
+                  style={{
+                    left: `${coin.x}px`,
+                    top: `${coin.y}px`,
+                    position: 'absolute', // Убеждаемся, что позиционирование абсолютное
+                  }}
+                  variants={coinVariants}
+                  initial="initial"
+                  animate={coin.collected ? "collected" : "initial"}
+                  exit="collected"
+                />
+              ))}
+            </AnimatePresence>
+
+            {/* Медвежонок у финиша */}
+            {lastLog ? (
+              <motion.div 
+                className="bear"
+                style={{
+                  left: `${lastLog.x}px`,
+                  bottom: `${lastLog.y + 50}px`,
+                  zIndex: 10
+                }}
+                animate={bearCelebrating ? {
+                  y: [0, -20, 0],
+                  transition: {
+                    repeat: Infinity,
+                    duration: 0.5
+                  }
+                } : {}}
+              >
+                <div className="bear-ears" />
+                <div className="bear-face" />
+                <div className="bear-nose" />
+                <div className="bear-mask" />
+                <div className="bear-snorkel" />
+                <div className="bear-bubbles" />
+                <div className="bear-arms" />
+                <div className="bear-paws" />
+              </motion.div>
+            ) : (
+              <div
                 style={{
                   position: "absolute",
-                  left: `${logPositions[8].x}px`,
+                  left: "50%",
                   bottom: "150px",
-                  width: "50px",
-                  height: "60px",
-                  zIndex: 5
+                  color: "red",
+                  zIndex: 10,
+                  background: "rgba(0,0,0,0.5)",
+                  padding: "5px"
                 }}
               >
-                {/* Тело медвежонка */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '40px',
-                  height: '35px',
-                  background: '#8B4513',
-                  borderRadius: '50% 50% 40% 40%',
-                  zIndex: 2,
-                  animation: bearCelebrating ? 'bearJump 0.6s infinite' : 'none'
-                }} />
-                
-                {/* Голова медвежонка */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '25px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '30px',
-                  height: '30px',
-                  background: '#8B4513',
-                  borderRadius: '50%',
-                  zIndex: 3,
-                  animation: bearCelebrating ? 'bearJump 0.6s infinite' : 'none'
-                }}>
-                  {/* Ушки */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '-8px',
-                    left: '2px',
-                    width: '12px',
-                    height: '12px',
-                    background: '#8B4513',
-                    borderRadius: '50%'
-                  }} />
-                  <div style={{
-                    position: 'absolute',
-                    top: '-8px',
-                    right: '2px',
-                    width: '12px',
-                    height: '12px',
-                    background: '#8B4513',
-                    borderRadius: '50%'
-                  }} />
-                  
-                  {/* Мордочка */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '-2px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: '18px',
-                    height: '12px',
-                    background: '#D2B48C',
-                    borderRadius: '30% 30% 50% 50%'
-                  }} />
-                  
-                  {/* Подводная маска */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '5px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: '25px',
-                    height: '15px',
-                    background: 'rgba(0, 200, 255, 0.4)',
-                    border: '2px solid #555',
-                    borderRadius: '50%',
-                    boxShadow: 'inset 0 0 5px rgba(255, 255, 255, 0.6)'
-                  }} />
-                  
-                  {/* Глаза через маску */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '9px',
-                    left: '8px',
-                    width: '4px',
-                    height: '4px',
-                    background: 'black',
-                    borderRadius: '50%',
-                    zIndex: 4
-                  }} />
-                  <div style={{
-                    position: 'absolute',
-                    top: '9px',
-                    right: '8px',
-                    width: '4px',
-                    height: '4px',
-                    background: 'black',
-                    borderRadius: '50%',
-                    zIndex: 4
-                  }} />
-                </div>
-                
-                {/* Трубка для дыхания */}
-                <div style={{
-                  position: 'absolute',
-                  top: '10px',
-                  right: '5px',
-                  width: '5px',
-                  height: '25px',
-                  background: '#ff6a00',
-                  borderRadius: '5px',
-                  transform: 'rotate(-20deg)',
-                  zIndex: 1
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  top: '5px',
-                  right: '0',
-                  width: '12px',
-                  height: '8px',
-                  background: '#ff6a00',
-                  borderRadius: '5px',
-                  zIndex: 1
-                }} />
-                
-                {/* Пузырьки воздуха - больше пузырьков при праздновании */}
-                <div style={{
-                  position: 'absolute',
-                  top: '0',
-                  right: '3px',
-                  width: '4px',
-                  height: '4px',
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  borderRadius: '50%',
-                  animation: bearCelebrating ? 'moreBubbles 1.5s infinite' : 'bubbleRise 3s infinite'
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  top: '-5px',
-                  right: '8px',
-                  width: '3px',
-                  height: '3px',
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  borderRadius: '50%',
-                  animation: bearCelebrating ? 'moreBubbles 1s infinite 0.3s' : 'bubbleRise 2.5s infinite 0.5s'
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  top: '-10px',
-                  right: '5px',
-                  width: '5px',
-                  height: '5px',
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  borderRadius: '50%',
-                  animation: bearCelebrating ? 'moreBubbles 2s infinite 0.7s' : 'bubbleRise 4s infinite 1s'
-                }} />
-                
-                {/* Дополнительные пузырьки при праздновании */}
-                {bearCelebrating && (
-                  <>
-                    <div style={{
-                      position: 'absolute',
-                      top: '-7px',
-                      right: '10px',
-                      width: '6px',
-                      height: '6px',
-                      background: 'rgba(255, 255, 255, 0.8)',
-                      borderRadius: '50%',
-                      animation: 'moreBubbles 1.8s infinite 0.2s'
-                    }} />
-                    <div style={{
-                      position: 'absolute',
-                      top: '-3px',
-                      right: '2px',
-                      width: '4px',
-                      height: '4px',
-                      background: 'rgba(255, 255, 255, 0.8)',
-                      borderRadius: '50%',
-                      animation: 'moreBubbles 1.3s infinite 0.5s'
-                    }} />
-                  </>
-                )}
-                
-                {/* Руки */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '20px',
-                  left: '2px',
-                  width: '12px',
-                  height: '20px',
-                  background: '#8B4513',
-                  borderRadius: '30%',
-                  transform: 'rotate(-25deg)',
-                  zIndex: 1,
-                  animation: bearCelebrating ? 'celebrateWave 0.4s infinite' : 'none'
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  bottom: '20px',
-                  right: '2px',
-                  width: '12px',
-                  height: '20px',
-                  background: '#8B4513',
-                  borderRadius: '30%',
-                  transform: 'rotate(25deg)',
-                  zIndex: 1,
-                  animation: bearCelebrating ? 'celebrateWaveRight 0.4s infinite' : 'none'
-                }} />
-                
-                {/* Ноги */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '0px',
-                  left: '7px',
-                  width: '10px',
-                  height: '12px',
-                  background: '#8B4513',
-                  borderRadius: '30% 30% 50% 50%',
-                  animation: bearCelebrating ? 'bearJump 0.6s infinite' : 'none'
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  bottom: '0px',
-                  right: '7px',
-                  width: '10px',
-                  height: '12px',
-                  background: '#8B4513',
-                  borderRadius: '30% 30% 50% 50%',
-                  animation: bearCelebrating ? 'bearJump 0.6s infinite' : 'none'
-                }} />
-                
-                {/* Ласты */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '-5px',
-                  left: '2px',
-                  width: '18px',
-                  height: '8px',
-                  background: '#4d94ff',
-                  borderRadius: '0 0 50% 50%',
-                  transform: 'rotate(-10deg)',
-                  animation: bearCelebrating ? 'finsFlap 0.3s infinite' : 'none'
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  bottom: '-5px',
-                  right: '2px',
-                  width: '18px',
-                  height: '8px',
-                  background: '#4d94ff',
-                  borderRadius: '0 0 50% 50%',
-                  transform: 'rotate(10deg)',
-                  animation: bearCelebrating ? 'finsFlipRight 0.3s infinite' : 'none'
-                }} />
+                Медвежонок не отображается: lastLog отсутствует
               </div>
             )}
+
+            {/* Рыбы */}
+            {fishes.map((fish, index) => (
+              <motion.div
+                key={`fish-${index}`}
+                className="fish"
+                style={{
+                  left: `${fish.x}px`,
+                  bottom: `${fish.y}px`
+                }}
+              />
+            ))}
+
+            {/* Летающие рыбки в небе */}
+            {decorativeFishes.map(fish => (
+              <motion.div
+                key={`decorative-fish-${fish.id}`}
+                className={`fish ${fish.direction === "left" ? "swimming-left" : ""}`}
+                style={{
+                  left: `${fish.x}px`,
+                  top: `${fish.y}px`,
+                  transform: `scale(${fish.size}) ${fish.direction === "left" ? "scaleX(-1)" : ""}`,
+                  zIndex: 4, // За бревнами, но перед фоном
+                  filter: `hue-rotate(${fish.id * 30}deg) brightness(${1 + fish.id % 3 * 0.1})` // Добавляем разнообразие цветов
+                }}
+                animate={{
+                  y: [fish.y - 15, fish.y + 15],
+                  rotate: [fish.direction === "left" ? -10 : 10, fish.direction === "left" ? 10 : -10],
+                  transition: {
+                    y: {
+                      repeat: Infinity,
+                      duration: 2 + Math.random() * 2,
+                      repeatType: "reverse",
+                      ease: "easeInOut"
+                    },
+                    rotate: {
+                      repeat: Infinity,
+                      duration: 2 + Math.random(),
+                      repeatType: "reverse",
+                      ease: "easeInOut"
+                    }
+                  }
+                }}
+                whileHover={{ scale: fish.size * 1.2, y: fish.y - 10 }} // Больше реакция при наведении, как будто птица взлетает выше
+              >
+                {/* Добавляем внутренние элементы "летающей рыбки" */}
+                <div 
+                  className="fish-fin-top" 
+                  style={{ 
+                    background: `linear-gradient(to top, ${fish.color}, transparent)`,
+                    transform: `rotate(${Math.sin(Date.now() / 500 + fish.id) * 20}deg)` // Более быстрое и выраженное движение крыльев
+                  }} 
+                />
+                <div 
+                  className="fish-fin-bottom" 
+                  style={{ 
+                    background: `linear-gradient(to bottom, ${fish.color}, transparent)`,
+                    transform: `rotate(${Math.cos(Date.now() / 500 + fish.id) * 20}deg)` // Более быстрое и выраженное движение крыльев
+                  }} 
+                />
+                <div className="fish-eye" />
+                <div className="fish-bubbles" style={{ opacity: 0.7 + Math.sin(Date.now() / 300 + fish.id) * 0.3 }}>
+                  <div className="fish-bubble" />
+                  <div className="fish-bubble" />
+                  <div className="fish-bubble" />
+                </div>
+              </motion.div>
+            ))}
           </div>
-          <div className="game-info">
-            <div className="time">Time: {time}</div>
-            <div className="score">Score: {score}</div>
-            <div className="lives">Lives: {"❤️".repeat(Math.max(0, lives))}</div>
-            <div className="logs">Logs: {currentLogIndex}/9</div>
-          </div>
-          <div className="controls">
-            <p>Controls:</p>
-            <p>← or A - Back</p>
-            <p>→ or D - Forward</p>
-          </div>
-          {stage === Stage.FINISH && (
-            <div className="youWin">
-              <div>
-                {currentLogIndex === logs.length - 1
-                  ? `Поздравляем! Вы прошли уровень! Ваши очки: ${score}`
-                  : `Игра окончена! Набрано очков: ${score}`}
-              </div>
-            </div>
-          )}
-        </div>
+        </>
       )}
-    </>
+      {stage === Stage.FINISH && (
+        <EndScreen
+          onRestart={resetGame}
+          score={score}
+          savedScores={savedScores}
+          isWin={coinsCollected >= 9 && currentLogIndex === logs.length - 1}
+        />
+      )}
+    </div>
   );
 };
 

@@ -1,78 +1,90 @@
 .start-page {
+  position: relative;
+  width: 100%;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh;
-  background: linear-gradient(to bottom, #87CEEB, #1E90FF);
-  position: relative;
+  background: linear-gradient(180deg, #87CEEB 0%, #1E90FF 100%);
   overflow: hidden;
-}
-
-.game-title {
-  font-size: 48px;
-  color: white;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-  margin-bottom: 30px;
-  z-index: 1;
-}
-
-.start-button {
-  padding: 15px 30px;
-  font-size: 24px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: transform 0.2s, background-color 0.2s;
-  z-index: 1;
-}
-
-.start-button:hover {
-  transform: scale(1.1);
-  background-color: #45a049;
-}
-
-.scores {
-  color: white;
-  font-size: 24px;
-  margin-bottom: 20px;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-  z-index: 1;
 }
 
 .floating-snowflakes {
   position: absolute;
   width: 100%;
   height: 100%;
+  pointer-events: none;
 }
 
 .start-snowflake {
   position: absolute;
-  font-size: 20px;
-  animation: float 5s linear infinite;
-  opacity: 0.8;
+  font-size: 24px;
+  user-select: none;
+  z-index: 1;
 }
 
-@keyframes float {
-  0% {
-    transform: translateY(-100%);
-  }
-  100% {
-    transform: translateY(100vh);
-  }
+.game-title {
+  font-size: 48px;
+  color: #ffffff;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  margin-bottom: 40px;
+  text-align: center;
+  z-index: 2;
 }
 
-.start-page::after {
+.scores {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 40px;
+  text-align: center;
+  z-index: 2;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.scores p {
+  margin: 10px 0;
+  font-size: 18px;
+  color: white;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.start-button {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 15px 30px;
+  font-size: 24px;
+  border-radius: 25px;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.start-button:hover {
+  background: #45a049;
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes wave {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0); }
+}
+
+.start-page::before {
   content: '';
   position: absolute;
   bottom: 0;
   left: 0;
-  right: 0;
-  height: 30vh;
-  background: linear-gradient(0deg, rgba(255,255,255,0.1) 0%, transparent 100%);
-  clip-path: polygon(0 40%, 100% 0, 100% 100%, 0% 100%);
+  width: 100%;
+  height: 100px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.1) 100%);
+  animation: wave 3s ease-in-out infinite;
 }
 
 .game-instructions {

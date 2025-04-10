@@ -1,8 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useContext } from "react";
+import gameMusic from "./audio/Rain.mp3";
+import hitSound from "./audio/hit.mp3";
+import victorySound from "./audio/p9.mp3";
+import "../styles/Birds.css";
 import "../styles/Climber.css";
-import "../styles/Obstacles.css";
+import "../styles/Rocks.css";
 import "../styles/Sun.css";
-import RainSound from "../components/audio/Rain.mp3";
+import "../styles/Obstacles.css";
+import "../styles/StartPage.css";
+import { PauseContext } from "../App.tsx";
+import { motion } from "framer-motion";
 
 enum Stage {
   START = "start",
@@ -15,6 +22,7 @@ interface CoinClimbingGameProps {
 }
 
 const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
+  const { isPaused } = useContext(PauseContext);
   const [stage, setStage] = useState<Stage>(Stage.START);
   const [climber, setClimber] = useState({ x: 50, y: 450, isJumping: false });
   const [lives, setLives] = useState(3);
@@ -39,7 +47,7 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
   const [victory, setVictory] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [pressedKeys, setPressedKeys] = useState(new Set<string>());
-  const [audio] = useState(new Audio(RainSound));
+  const [audio] = useState(new Audio(gameMusic));
   const [logs, setLogs] = useState([
     { x: 200, y: 350 },
     { x: 500, y: 350 },
@@ -84,7 +92,7 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (gameOver || victory) return;
+      if (gameOver || victory || isPaused) return;
 
       setPressedKeys(prev => {
         const newKeys = new Set(prev);
@@ -169,17 +177,18 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [climber.isJumping, gameOver, victory, pressedKeys]);
+  }, [climber.isJumping, gameOver, victory, pressedKeys, isPaused]);
 
   useEffect(() => {
-    if (gameOver || victory) return;
+    if (gameOver || victory || isPaused) return;
 
     const gameLoop = setInterval(() => {
+      // Обновляем пауков - двигаем их горизонтально и меняем направление у границ экрана
       setSpiders((prev) =>
         prev.map((spider) => {
           let newX = spider.x + spider.speed;
           if (newX <= 0 || newX >= 950) {
-            return { ...spider, x: newX, speed: -spider.speed };
+            return { ...spider, x: newX <= 0 ? 0 : 950, speed: -spider.speed };
           }
           return { ...spider, x: newX };
         })
@@ -234,21 +243,6 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
           return coin;
         })
       );
-
-      // Проверка на показ финишного медвежонка
-      const allCoinsCollected = coins.every(coin => coin.collected);
-      if (allCoinsCollected && !showFinishBear) {
-        setShowFinishBear(true);
-      }
-
-      // Проверка на достижение финиша
-      if (showFinishBear && 
-          Math.abs(climber.x - 950) < 50 && 
-          Math.abs(climber.y - 450) < 30) {
-        setVictory(true);
-        audio.pause();
-        audio.currentTime = 0;
-      }
 
       // Перемещение медвежонка и логика бочонка меда
       setBear(prev => {
@@ -317,22 +311,36 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
     }, 1000 / 60);
 
     return () => clearInterval(gameLoop);
-  }, [climber.x, climber.y, spiders, coins, gameOver, victory, lives, isInvulnerable, audio, honeyPot.active, showFinishBear]);
+  }, [climber.x, climber.y, spiders, coins, gameOver, victory, lives, isInvulnerable, audio, honeyPot.active, showFinishBear, isPaused, onComplete]);
 
   useEffect(() => {
     if (stage === Stage.GAME) {
-      audio.loop = true;
-      audio.volume = 0.3;
-      audio.play();
+      if (audio) {
+        audio.loop = true;
+        audio.volume = 0.3;
+        
+        if (isPaused) {
+          audio.pause();
+        } else {
+          audio.play().catch(err => {
+            console.log("Аудио будет воспроизведено при следующем взаимодействии");
+          });
+        }
+      }
     } else {
-      audio.pause();
-      audio.currentTime = 0;
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
     }
+    
     return () => {
-      audio.pause();
-      audio.currentTime = 0;
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
     };
-  }, [stage, audio]);
+  }, [stage, audio, isPaused]);
 
   const collectedCoins = coins.filter((coin) => coin.collected).length;
 
@@ -362,6 +370,40 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
       { x: 300, y: 380, collected: false },
     ]);
   };
+
+  // Изменяем логику проверки победы
+  useEffect(() => {
+    // Проверяем, собраны ли все монеты
+    const allCoinsCollected = coins.every(coin => coin.collected);
+    
+    // Если все монеты собраны, показываем финишного медвежонка
+    if (allCoinsCollected && !showFinishBear && stage === Stage.GAME) {
+      console.log("Все монеты собраны, показываем медвежонка");
+      setShowFinishBear(true);
+    }
+    
+    // Победа только если показан медвежонок (все монеты собраны) и игрок у правого края
+    if (showFinishBear && stage === Stage.GAME && !victory && 
+        climber.x > 850 && climber.y >= 400) {
+      console.log("Победа! Игрок собрал все монеты и достиг финиша");
+      setVictory(true);
+      
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        
+        // Проигрываем звук победы если он существует
+        const victoryAudio = new Audio(victorySound);
+        victoryAudio.volume = 0.5;
+        victoryAudio.play().catch(() => console.log("Не удалось воспроизвести звук победы"));
+      }
+      
+      // Вызываем onComplete, если он был передан
+      if (onComplete) {
+        onComplete();
+      }
+    }
+  }, [coins, climber.x, climber.y, showFinishBear, victory, stage, audio, onComplete]);
 
   return (
     <div>
@@ -924,23 +966,99 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
         ) : null
       )}
 
+      {/* Пауки */}
       {spiders.map((spider, index) => (
         <div
-          key={index}
-              className="spider"
+          key={`spider-${index}`}
           style={{
-            left: spider.x,
-            top: spider.y,
-              }}
-            />
+            position: 'absolute',
+            left: `${spider.x}px`,
+            top: `${spider.y - 40}px`, // Поднимаем паука выше, чтобы он был на линии грунта
+            width: '40px',
+            height: '40px',
+            zIndex: 5,
+            transform: `scaleX(${spider.speed > 0 ? 1 : -1})`,
+            transition: 'transform 0.2s'
+          }}
+        >
+          {/* Тело паука */}
+          <div style={{
+            position: 'absolute',
+            bottom: '5px',
+            left: '5px',
+            width: '30px',
+            height: '20px',
+            borderRadius: '50%',
+            background: 'black',
+            zIndex: 2
+          }} />
+          
+          {/* Голова паука */}
+          <div style={{
+            position: 'absolute',
+            bottom: '15px',
+            left: '15px',
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            background: 'black',
+            zIndex: 3
+          }}>
+            {/* Глаза */}
+            <div style={{
+              position: 'absolute',
+              top: '2px',
+              left: '2px',
+              width: '3px',
+              height: '3px',
+              borderRadius: '50%',
+              background: 'red',
+            }} />
+            <div style={{
+              position: 'absolute',
+              top: '2px',
+              right: '2px',
+              width: '3px',
+              height: '3px',
+              borderRadius: '50%',
+              background: 'red',
+            }} />
+          </div>
+          
+          {/* Ноги паука */}
+          {[...Array(4)].map((_, i) => (
+            <React.Fragment key={i}>
+              <div style={{
+                position: 'absolute',
+                bottom: '15px',
+                left: i < 2 ? '5px' : '25px',
+                width: '2px',
+                height: '12px',
+                background: 'black',
+                transformOrigin: 'bottom center',
+                transform: `rotate(${i % 2 === 0 ? -45 : 45}deg) translateY(${Math.sin(Date.now() / 200 + i) * 3}px)`,
+              }} />
+              <div style={{
+                position: 'absolute',
+                bottom: '5px',
+                left: i < 2 ? '5px' : '25px',
+                width: '2px',
+                height: '12px',
+                background: 'black',
+                transformOrigin: 'top center',
+                transform: `rotate(${i % 2 === 0 ? -135 : 135}deg) translateY(${Math.sin(Date.now() / 200 + i + 2) * 3}px)`,
+              }} />
+            </React.Fragment>
           ))}
+        </div>
+      ))}
 
           {logs.map((log, index) => (
-            <div
-              key={index}
+        <div
+          key={index}
               className="log"
-              style={{
-                position: "absolute",
+          style={{
+            position: "absolute",
                 left: log.x,
                 top: log.y,
                 width: "100px",
@@ -1031,6 +1149,42 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
                 Играть снова
               </button>
             </div>
+          )}
+
+          {isPaused && stage === Stage.GAME && (
+            <motion.div 
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                backgroundColor: "rgba(0, 0, 0, 0.7)",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                zIndex: 999
+              }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <motion.h1 
+                style={{
+                  color: "white",
+                  fontSize: "48px",
+                  textShadow: "0 0 10px #00ffff"
+                }}
+                animate={{
+                  scale: [1, 1.1, 1],
+                  transition: {
+                    repeat: Infinity,
+                    duration: 1.5
+                  }
+                }}
+              >
+                ПАУЗА
+              </motion.h1>
+            </motion.div>
           )}
         </div>
       )}

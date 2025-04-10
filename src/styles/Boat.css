@@ -9,9 +9,16 @@
   position: absolute;
   width: 40px;
   height: 40px;
-  background: #8B4513; /* Коричневый цвет вместо изображения */
-  border-radius: 50%;
-  transition: all 0.15s ease; /* Плавный прыжок */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 30px;
+  transition: transform 0.3s ease;
+}
+
+.climber::after {
+  content: '🧗';
+  transition: transform 0.2s ease;
 }
 
 .climber.jumping {
@@ -24,52 +31,222 @@
 
 .log {
   position: absolute;
-  width: 60px;
+  width: 100px;
   height: 20px;
-  background: #8B4513; /* Коричневый цвет бревна */
-  border-radius: 5px;
+  background: #8B4513;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
+/* Стили для рыбок-эмодзи */
 .fish {
   position: absolute;
   width: 40px;
   height: 40px;
+  font-size: 30px;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 30px;
-  transition: bottom 0.1s ease; /* Плавное движение рыбы */
-}
-
-.fish::before {
-  content: '';
-}
-
-.fish.up::after {
-  content: '🐟';
-  transform: scaleX(1);
-}
-
-.fish.down::after {
-  content: '🐟';
-  transform: scaleX(-1);
-}
-
-@keyframes swim {
-  0% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-5px);
-  }
-  100% {
-    transform: translateY(0);
-  }
+  z-index: 5;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  animation: fishFloating 3s ease-in-out infinite alternate;
+  transform-origin: center;
 }
 
 .fish::after {
-  display: block;
-  animation: swim 2s infinite ease-in-out;
+  content: '🐠'; /* Эмодзи рыбки */
+}
+
+.fish:nth-child(2n)::after {
+  content: '🐡'; /* Чередование разных эмодзи рыбок */
+}
+
+.fish:nth-child(3n)::after {
+  content: '🦈'; /* Иногда акула */
+}
+
+.fish:nth-child(5n)::after {
+  content: '🐙'; /* Иногда осьминог */
+}
+
+.fish.swimming-left {
+  transform: scaleX(-1); /* Отражаем рыбку по горизонтали, когда она плывет влево */
+}
+
+.fish.dangerous {
+  animation: dangerousFish 2s ease-in-out infinite alternate;
+}
+
+.fish.dangerous::after {
+  content: '🦈'; /* Акула для опасных рыб */
+}
+
+/* Анимации для рыбок */
+@keyframes fishFloating {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+  100% {
+    transform: translateY(5px) rotate(-5deg);
+  }
+}
+
+@keyframes dangerousFish {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.3));
+  }
+  50% {
+    transform: translateY(-5px) scale(1.1);
+    filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.5));
+  }
+  100% {
+    transform: translateY(5px) scale(1);
+    filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.3));
+  }
+}
+
+/* Глаз рыбки */
+.fish-eye {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: white;
+  border-radius: 50%;
+  top: 8px;
+  left: 5px;
+  z-index: 6;
+  border: 1px solid rgba(0, 0, 0, 0.5); /* Добавляем обводку для глаза */
+}
+
+/* Зрачок рыбки */
+.fish-eye::after {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: black;
+  border-radius: 50%;
+  top: 1px;
+  right: 1px;
+}
+
+/* Плавник сверху (теперь как крыло) */
+.fish-fin-top {
+  position: absolute;
+  width: 15px;
+  height: 12px;
+  background: linear-gradient(to top, #E1F5FE, rgba(255, 255, 255, 0.5));
+  border-radius: 50% 50% 0 0;
+  top: -5px;
+  left: 10px;
+  transform-origin: bottom center;
+  animation: fishWing 0.5s ease-in-out infinite alternate;
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.5); /* Добавляем свечение для крыльев */
+  border: 1px solid rgba(200, 200, 255, 0.3); /* Легкая обводка для крыльев */
+}
+
+/* Плавник снизу (второе крыло) */
+.fish-fin-bottom {
+  position: absolute;
+  width: 15px;
+  height: 12px;
+  background: linear-gradient(to bottom, #E1F5FE, rgba(255, 255, 255, 0.5));
+  border-radius: 0 0 50% 50%;
+  bottom: -5px;
+  left: 10px;
+  transform-origin: top center;
+  animation: fishWing 0.5s ease-in-out infinite alternate-reverse;
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.5); /* Добавляем свечение для крыльев */
+  border: 1px solid rgba(200, 200, 255, 0.3); /* Легкая обводка для крыльев */
+}
+
+/* Пузырьки от рыбок (теперь как следы в небе) */
+.fish-bubbles {
+  position: absolute;
+  width: 30px;
+  height: 20px;
+  pointer-events: none;
+  right: -20px;
+  top: 5px;
+}
+
+.fish-bubble {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.6); 
+  border-radius: 50%;
+  opacity: 0.7;
+  animation: skyTrail 3s linear infinite;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.8); /* Яркое свечение для следов в небе */
+}
+
+.fish-bubble:nth-child(1) {
+  top: 3px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  animation-delay: 0s;
+}
+
+.fish-bubble:nth-child(2) {
+  top: 0;
+  left: 8px;
+  width: 5px;
+  height: 5px;
+  animation-delay: 0.5s;
+}
+
+.fish-bubble:nth-child(3) {
+  top: 5px;
+  left: 15px;
+  width: 3px;
+  height: 3px;
+  animation-delay: 1.2s;
+}
+
+/* Анимации для рыбок-птиц */
+@keyframes fishTail {
+  0% {
+    transform: scaleX(0.8);
+  }
+  100% {
+    transform: scaleX(1.1);
+  }
+}
+
+@keyframes fishWing {
+  0% {
+    transform: rotate(-15deg) scaleY(0.8);
+  }
+  100% {
+    transform: rotate(15deg) scaleY(1.2);
+  }
+}
+
+@keyframes skyTrail {
+  0% {
+    opacity: 0.7;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.5);
+  }
+}
+
+/* Анимации плавания рыбок */
+@keyframes fishSwimmingHorizontal {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(30px);
+  }
 }
 
 .wrapper {
@@ -150,21 +327,293 @@
   }
 }
 
-@keyframes splash {
-  0% {
-    transform: scale(0.8, 0.2);
-    opacity: 0.9;
+.water-layer {
+  box-shadow: 0 0 20px rgba(0, 195, 255, 0.7);
+}
+
+.game-container {
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(180deg, #87CEEB 0%, #1E90FF 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.coin {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+}
+
+.coin::after {
+  content: '🪙';
+}
+
+.bear {
+  position: absolute;
+  width: 80px;
+  height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+/* Голова медвежонка */
+.bear::before {
+  content: '';
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  background: #8B4513;
+  border-radius: 50%;
+  top: 10px;
+}
+
+/* Тело медвежонка */
+.bear::after {
+  content: '';
+  position: absolute;
+  width: 50px;
+  height: 60px;
+  background: #8B4513;
+  border-radius: 25px;
+  bottom: 0;
+}
+
+/* Уши */
+.bear-ears {
+  position: absolute;
+  width: 100%;
+  top: 0;
+}
+
+.bear-ears::before,
+.bear-ears::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #8B4513;
+  border-radius: 50%;
+  top: 5px;
+}
+
+.bear-ears::before {
+  left: 15px;
+}
+
+.bear-ears::after {
+  right: 15px;
+}
+
+/* Маска для плавания */
+.bear-mask {
+  position: absolute;
+  width: 50px;
+  height: 30px;
+  background: #00CED1;
+  border: 3px solid #008B8B;
+  border-radius: 15px;
+  top: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+/* Стекла маски */
+.bear-mask::before,
+.bear-mask::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 2px solid #008B8B;
+  border-radius: 50%;
+  top: 4px;
+}
+
+.bear-mask::before {
+  left: 4px;
+}
+
+.bear-mask::after {
+  right: 4px;
+}
+
+/* Трубка */
+.bear-snorkel {
+  position: absolute;
+  width: 8px;
+  height: 40px;
+  background: #FF6B6B;
+  border-radius: 4px;
+  top: 10px;
+  right: 15px;
+  transform: rotate(-15deg);
+}
+
+/* Загубник трубки */
+.bear-snorkel::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 8px;
+  background: #FF6B6B;
+  border-radius: 4px;
+  bottom: -2px;
+  left: -3px;
+  transform: rotate(15deg);
+}
+
+/* Анимация покачивания */
+@keyframes floatingBear {
+  0%, 100% {
+    transform: translateY(0);
   }
   50% {
-    transform: scale(1, 0.4);
-    opacity: 0.7;
+    transform: translateY(-10px);
+  }
+}
+
+.bear {
+  animation: floatingBear 3s ease-in-out infinite;
+}
+
+/* Пузырьки */
+@keyframes bubble {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(-20px) scale(1.2);
+    opacity: 1;
   }
   100% {
-    transform: scale(1.2, 0.3);
+    transform: translateY(-40px) scale(1);
     opacity: 0;
   }
 }
 
-.water-layer {
-  box-shadow: 0 0 20px rgba(0, 195, 255, 0.7);
+.bear-bubbles {
+  position: absolute;
+  top: 5px;
+  right: 10px;
 }
+
+.bear-bubbles::before,
+.bear-bubbles::after {
+  content: '○';
+  position: absolute;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  animation: bubble 2s infinite;
+}
+
+.bear-bubbles::after {
+  top: -10px;
+  right: 5px;
+  animation-delay: 1s;
+}
+
+.game-ui {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 20px;
+  font-size: 24px;
+  color: white;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  z-index: 3;
+}
+
+.game-ui > div {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 10px 20px;
+  border-radius: 10px;
+  backdrop-filter: blur(5px);
+}
+
+.pause-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.pause-screen h1 {
+  color: white;
+  font-size: 64px;
+  margin-bottom: 20px;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.pause-screen p {
+  color: white;
+  font-size: 24px;
+  opacity: 0.8;
+}
+
+/* Анимация прыжка альпиниста */
+@keyframes climberJump {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2) translateY(-5px); }
+  100% { transform: scale(1); }
+}
+
+.climber.jumping::after {
+  animation: climberJump 0.6s ease;
+}
+
+/* Небольшое покачивание для стоящего альпиниста */
+@keyframes climberIdle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.climber:not(.jumping)::after {
+  animation: climberIdle 2s ease-in-out infinite;
+}
+
+/* Добавляем стили для UI-элементов */
+
+.ui-container {
+  font-family: 'Arial', sans-serif;
+}
+
+.lives-container, .time-container, .coins-collected, .score-display {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.lives-container:hover, .time-container:hover, .coins-collected:hover, .score-display:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Стили для анимации сбора монет */
+@keyframes collectCoin {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.8; }
+  100% { transform: scale(0); opacity: 0; }
+}
+
+.coin.collected {
+  animation: collectCoin 0.5s forwards;
+}
+
+/* Расширяем существующие стили */
