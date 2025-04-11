@@ -435,6 +435,19 @@ const ClimbingGame: React.FC<ClimbingGameProps> = ({ onComplete }) => {
             >
               Лучший счет: {savedScores}
             </motion.div>
+
+            <motion.div
+              className="instructions"
+              initial={{ x: -50, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.7, duration: 0.5 }}
+            >
+              <p>Используйте клавиши Z и X для перемещения между линиями</p>
+              <p>Избегайте падающих камней</p>
+              <p>Наберите 90 очков затем доберитесь до флага на вершине, чтобы победить!</p>
+              <p style={{ color: "#ff5555" }}>Внимание! Некоторые участки пути могут внезапно исчезать</p>
+            </motion.div>
+            
             <motion.button 
               className="start-button" 
               onClick={handleStartClick}

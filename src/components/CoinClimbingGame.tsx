@@ -450,6 +450,20 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
       {stage === Stage.START ? (
         <div className="start-page">
           <h1 className="game-title">Сбор лучшего меда</h1>
+          
+          <motion.div
+            className="instructions"
+            initial={{ x: -50, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.7, duration: 0.5 }}
+          >
+            <p>Используйте стрелки ← и → для передвижения</p>
+            <p>Нажмите стрелку ↑ для прыжка</p>
+            <p>Собирайте монеты и избегайте пауков</p>
+            <p>Соберите все монеты!</p>
+            <p style={{ color: "#ff5555" }}>Внимание! Падение с высоты может привести к потере жизни</p>
+          </motion.div>
+
           <button className="start-button" onClick={handleStartClick}>
             Начать игру
           </button>
