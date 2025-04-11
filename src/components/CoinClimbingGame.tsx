@@ -27,6 +27,7 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
   const [climber, setClimber] = useState({ x: 50, y: 450, isJumping: false });
   const [lives, setLives] = useState(3);
   const [isInvulnerable, setIsInvulnerable] = useState(false);
+  const [time, setTime] = useState<number>(49);
   const [coins, setCoins] = useState([
     { x: 100, y: 380, collected: false },
     { x: 200, y: 280, collected: false },
@@ -111,10 +112,10 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
             const newX = Math.max(0, Math.min(950, prev.x + horizontalMove));
             let newY = prev.y;
             
-            if (jumpHeight <= 200) {
-              newY = prev.y - 20;
+            if (jumpHeight <= 300) {
+              newY = prev.y - 30;
             } else {
-              newY = prev.y + 10;
+              newY = prev.y + 15;
               
               if (newY >= 450) {
                 clearInterval(jumpInterval);
@@ -342,15 +343,37 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
     };
   }, [stage, audio, isPaused]);
 
+  useEffect(() => {
+    let timerInterval: NodeJS.Timeout | undefined;
+
+    if (stage === Stage.GAME && time > 0 && !isPaused && !gameOver && !victory) {
+      timerInterval = setInterval(() => {
+        setTime(prevTime => prevTime - 1);
+      }, 1000);
+    }
+
+    if (time === 0) {
+      setGameOver(true);
+      audio.pause();
+      audio.currentTime = 0;
+    }
+
+    return () => {
+      if (timerInterval) clearInterval(timerInterval);
+    };
+  }, [stage, time, isPaused, gameOver, victory, audio]);
+
   const collectedCoins = coins.filter((coin) => coin.collected).length;
 
   const handleStartClick = () => {
     setStage(Stage.GAME);
     setClimber({ x: 50, y: 450, isJumping: false });
     setLives(3);
+    setTime(49);
     setIsInvulnerable(false);
     setGameOver(false);
     setVictory(false);
+    setShowFinishBear(false);
     setIsMoving(false);
     setPressedKeys(new Set<string>());
     setSpiders([
@@ -378,38 +401,55 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
     
     // Если все монеты собраны, показываем финишного медвежонка
     if (allCoinsCollected && !showFinishBear && stage === Stage.GAME) {
-      console.log("Все монеты собраны, показываем медвежонка");
+      console.log("Все монеты собраны, показываем медвежонка с надписью Победа");
       setShowFinishBear(true);
     }
     
-    // Победа только если показан медвежонок (все монеты собраны) и игрок у правого края
-    if (showFinishBear && stage === Stage.GAME && !victory && 
-        climber.x > 850 && climber.y >= 400) {
-      console.log("Победа! Игрок собрал все монеты и достиг финиша");
-      setVictory(true);
-      
-      if (audio) {
-        audio.pause();
-        audio.currentTime = 0;
+    // Победа только если показан медвежонок (все монеты собраны) и прошло некоторое время
+    if (showFinishBear && stage === Stage.GAME && !victory) {
+      // Даем игроку 3 секунды, чтобы насладиться надписью "Победа", затем показываем финальный экран
+      setTimeout(() => {
+        console.log("Победа! Игрок собрал все монеты");
+        setVictory(true);
         
-        // Проигрываем звук победы если он существует
-        const victoryAudio = new Audio(victorySound);
-        victoryAudio.volume = 0.5;
-        victoryAudio.play().catch(() => console.log("Не удалось воспроизвести звук победы"));
-      }
-      
-      // Вызываем onComplete, если он был передан
-      if (onComplete) {
-        onComplete();
-      }
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+          
+          // Проигрываем звук победы если он существует
+          const victoryAudio = new Audio(victorySound);
+          victoryAudio.volume = 0.5;
+          victoryAudio.play().catch(() => console.log("Не удалось воспроизвести звук победы"));
+        }
+        
+        // Вызываем onComplete, если он был передан
+        if (onComplete) {
+          onComplete();
+        }
+      }, 3000);
     }
-  }, [coins, climber.x, climber.y, showFinishBear, victory, stage, audio, onComplete]);
+  }, [coins, showFinishBear, victory, stage, audio, onComplete]);
 
   return (
     <div>
+      <style>
+        {`
+          @keyframes balloon-sway {
+            0% { transform: rotate(-5deg) translateY(0); }
+            50% { transform: rotate(5deg) translateY(-5px); }
+            100% { transform: rotate(-5deg) translateY(0); }
+          }
+          
+          @keyframes rope-sway {
+            0% { transform: rotate(-2deg); }
+            50% { transform: rotate(2deg); }
+            100% { transform: rotate(-2deg); }
+          }
+        `}
+      </style>
       {stage === Stage.START ? (
         <div className="start-page">
-          <h1 className="game-title">Сбор монет</h1>
+          <h1 className="game-title">Сбор лучшего меда</h1>
           <button className="start-button" onClick={handleStartClick}>
             Начать игру
           </button>
@@ -763,18 +803,131 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
             ))}
           </div>
           
-          {/* Финишный медвежонок */}
+          {/* Финишный медвежонок с воздушными шариками */}
           {showFinishBear && (
           <div 
             style={{
               position: 'absolute',
-              bottom: '50px',
-              right: '50px',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -80%)',
               width: '45px',
               height: '55px',
-              zIndex: 4
+              zIndex: 10 // Увеличиваем z-index чтобы быть уверенным что медвежонок поверх всего
             }}
           >
+            {/* Надпись "Победа!" над медвежонком */}
+            <motion.div
+              style={{
+                position: 'absolute',
+                top: '-80px', // Размещаем над шариками
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '150px',
+                textAlign: 'center',
+                fontSize: '28px',
+                fontWeight: 'bold',
+                color: '#228B22', // Зеленый цвет для надписи "Победа"
+                textShadow: '2px 2px 4px rgba(0,0,0,0.5), 0 0 10px rgba(255,255,255,0.8)',
+                padding: '10px',
+                zIndex: 12
+              }}
+              animate={{
+                scale: [1, 1.2, 1],
+                y: [0, -5, 0],
+                transition: {
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }
+              }}
+            >
+              Победа!
+            </motion.div>
+            
+            {/* Воздушные шарики сверху */}
+            <div style={{
+              position: 'absolute',
+              top: '-80px',
+              left: '10px',
+              width: '70px',
+              height: '70px',
+              zIndex: 3
+            }}>
+              {/* Шарик 1 (красный) */}
+              <div style={{
+                position: 'absolute',
+                top: '0px',
+                left: '0px',
+                width: '25px',
+                height: '30px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle at 30% 30%, #ff6b6b, #ff0000)',
+                boxShadow: '0 0 5px rgba(0,0,0,0.3), inset 0 0 10px rgba(255,255,255,0.5)',
+                animation: 'balloon-sway 3s ease-in-out infinite alternate'
+              }}></div>
+              
+              {/* Шарик 2 (синий) */}
+              <div style={{
+                position: 'absolute',
+                top: '5px',
+                left: '20px',
+                width: '30px',
+                height: '35px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle at 30% 30%, #6bb5ff, #0066ff)',
+                boxShadow: '0 0 5px rgba(0,0,0,0.3), inset 0 0 10px rgba(255,255,255,0.5)',
+                animation: 'balloon-sway 2.5s ease-in-out infinite alternate-reverse'
+              }}></div>
+              
+              {/* Шарик 3 (желтый) */}
+              <div style={{
+                position: 'absolute',
+                top: '10px',
+                left: '45px',
+                width: '25px',
+                height: '30px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle at 30% 30%, #fff06b, #ffcc00)',
+                boxShadow: '0 0 5px rgba(0,0,0,0.3), inset 0 0 10px rgba(255,255,255,0.5)',
+                animation: 'balloon-sway 2.8s ease-in-out infinite alternate'
+              }}></div>
+              
+              {/* Верёвочки от шариков */}
+              <div style={{
+                position: 'absolute',
+                top: '30px',
+                left: '12px',
+                width: '1px',
+                height: '50px',
+                background: '#333',
+                transformOrigin: 'top center',
+                animation: 'rope-sway 3s ease-in-out infinite alternate'
+              }}></div>
+              
+              <div style={{
+                position: 'absolute',
+                top: '35px',
+                left: '35px',
+                width: '1px',
+                height: '45px',
+                background: '#333',
+                transformOrigin: 'top center',
+                animation: 'rope-sway 2.5s ease-in-out infinite alternate-reverse'
+              }}></div>
+              
+              <div style={{
+                position: 'absolute',
+                top: '40px',
+                left: '58px',
+                width: '1px',
+                height: '40px',
+                background: '#333',
+                transformOrigin: 'top center',
+                animation: 'rope-sway 2.8s ease-in-out infinite alternate'
+              }}></div>
+            </div>
+            
             {/* Тело медвежонка */}
             <div style={{
               position: 'absolute',
@@ -863,9 +1016,22 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
                 background: 'black',
                 borderRadius: '50%'
               }} />
+              
+              {/* Улыбка */}
+              <div style={{
+                position: 'absolute',
+                bottom: '3px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '10px',
+                height: '5px',
+                border: 'none',
+                borderBottom: '2px solid black',
+                borderRadius: '0 0 100% 100%'
+              }} />
             </div>
             
-            {/* Руки */}
+            {/* Руки вверх - держат веревочки */}
             <div style={{
               position: 'absolute',
               top: '25px',
@@ -874,7 +1040,8 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
               height: '20px',
               background: '#8B4513',
               borderRadius: '30%',
-              transform: 'rotate(-20deg)'
+              transform: 'rotate(-45deg)',
+              transformOrigin: 'top center'
             }} />
             <div style={{
               position: 'absolute',
@@ -884,7 +1051,8 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
               height: '20px',
               background: '#8B4513',
               borderRadius: '30%',
-              transform: 'rotate(20deg)'
+              transform: 'rotate(45deg)',
+              transformOrigin: 'top center'
             }} />
             
             {/* Ноги */}
@@ -906,42 +1074,36 @@ const CoinClimbingGame: React.FC<CoinClimbingGameProps> = ({ onComplete }) => {
               background: '#8B4513',
               borderRadius: '30% 30% 50% 50%'
             }} />
-            
-            {/* Флажок финиша */}
-            <div style={{
-              position: 'absolute',
-              top: '-30px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: '4px',
-              height: '40px',
-              background: '#888',
-              zIndex: 1
-            }}>
-              <div style={{
-                position: 'absolute',
-                top: '0',
-                left: '4px',
-                width: '20px',
-                height: '15px',
-                background: '#ff4d4d',
-                clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)'
-              }} />
-            </div>
           </div>
           )}
           
           <div style={{ 
-          position: "absolute",
+            position: "absolute",
             top: 10, 
             left: 10, 
             color: "white", 
             fontSize: "24px",
             display: "flex",
-            gap: "20px"
+            gap: "20px",
+            background: "rgba(0,0,0,0.5)",
+            padding: "10px",
+            borderRadius: "10px",
+            zIndex: 10
           }}>
             <div>Монеты: {collectedCoins}/9</div>
             <div>Жизни: {"❤️".repeat(Math.max(0, lives))}</div>
+            <motion.div
+              animate={{
+                scale: time <= 10 ? [1, 1.2, 1] : 1,
+                color: time <= 10 ? ["#fff", "#ff0000", "#fff"] : "#fff",
+                transition: {
+                  repeat: time <= 10 ? Infinity : 0,
+                  duration: 0.5
+                }
+              }}
+            >
+              Время: {time}
+            </motion.div>
           </div>
 
           <div

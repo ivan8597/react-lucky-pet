@@ -28,6 +28,9 @@ type Fish = {
   lastJumpTime: number;
   jumpInterval: number;
   isDangerous?: boolean;
+  logIndex?: number;
+  isSafeState?: boolean;
+  lastStateChangeTime?: number;
 };
 
 type DecorativeFish = {
@@ -153,14 +156,46 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }): JSX.Element => {
     console.log("Начальные бревна:", initialLogs);
     setLogs(initialLogs);
     
-    const initialFishes = logPositions.slice(3, -1).map((log, i) => ({
-      x: (log.x + logPositions[i + 4].x) / 2,
-      y: 150,
-      direction: "up" as "up" | "down",
-      lastJumpTime: Date.now() + i * 500,
-      jumpInterval: 2000 + Math.random() * 2000,
-      isDangerous: Math.random() < 0.3,
-    }));
+    // Создаем рыбок на бревнах, пропускаем первое и последнее бревно для безопасности
+    const initialFishes = [];
+    
+    // Выбираем случайные бревна для размещения рыбок (исключая первое и последнее)
+    const logIndicesForFish = Array.from({ length: logPositions.length - 2 }, (_, i) => i + 1);
+    
+    // Перемешиваем индексы, чтобы выбор был случайным
+    for (let i = logIndicesForFish.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [logIndicesForFish[i], logIndicesForFish[j]] = [logIndicesForFish[j], logIndicesForFish[i]];
+    }
+    
+    // Выбираем 3-4 бревна для опасных рыбок
+    const dangerousFishCount = 3 + Math.floor(Math.random() * 2); // 3 или 4 опасные рыбки
+    const logIndicesWithDangerousFish = logIndicesForFish.slice(0, dangerousFishCount);
+    
+    // Создаем рыбок на выбранных бревнах с новыми свойствами
+    const currentTime = Date.now();
+    logIndicesWithDangerousFish.forEach((logIndex) => {
+      const log = logPositions[logIndex];
+      // Случайно определяем начальное состояние (безопасное/опасное)
+      const initialIsSafeState = Math.random() < 0.5;
+      initialFishes.push({
+        x: log.x,
+        y: log.y + 25, // Размещаем рыбку чуть выше бревна
+        direction: "up" as "up" | "down",
+        lastJumpTime: currentTime + Math.random() * 1000,
+        jumpInterval: 1500 + Math.random() * 1500,
+        isDangerous: true,
+        logIndex: logIndex, // Сохраняем индекс бревна, на котором находится рыбка
+        isSafeState: initialIsSafeState, // Случайное начальное состояние
+        lastStateChangeTime: currentTime - (initialIsSafeState 
+          ? Math.random() * 9000 // Если сейчас безопасное, то оно длится уже какое-то время
+          : Math.random() * 3000  // Если сейчас опасное, то оно тоже длится какое-то время
+        )
+      });
+    });
+    
+    // Устанавливаем только рыбок на бревнах, убираем рыбок между бревнами
+    setFishes(initialFishes);
 
     // Создаем декоративных рыбок в самой верхней части экрана
     const screenWidth = window.innerWidth || 1000;
@@ -181,7 +216,6 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }): JSX.Element => {
       isDangerous: Math.random() < 0.2,
     }));
 
-    setFishes(initialFishes);
     setDecorativeFishes(initialDecorativeFishes);
     setBoats([]);
     setBananas([]);
@@ -194,7 +228,7 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }): JSX.Element => {
     setIsJumping(false);
     setIsHit(false);
     setIsInvulnerable(false);
-    
+
     // Дополнительная проверка
     console.log("После установки логов:", initialLogs.length);
   }, [logPositions]);
@@ -225,75 +259,167 @@ const BoatGame: React.FC<BoatGameProps> = ({ onComplete }): JSX.Element => {
   const checkCollision = useCallback(() => {
     if (stage !== Stage.GAME || isHit) return;
 
-const currentLog = logs[currentLogIndex];
-if (!currentLog) return;
+    const currentLog = logs[currentLogIndex];
+    if (!currentLog) return;
 
-const distanceX = Math.abs(climberPosition.x - currentLog.x);
-const distanceY = Math.abs(climberPosition.y - currentLog.y);
+    const distanceX = Math.abs(climberPosition.x - currentLog.x);
+    const distanceY = Math.abs(climberPosition.y - currentLog.y);
 
-if (!isJumping && (distanceX > 25 || distanceY > 25) && currentLog.visible) {
-  hitAudioRef.current?.play();
-  setLives(prev => prev - 1);
-  setIsHit(true);
-  setTimeout(() => {
-    setIsHit(false);
-  }, 500);
-}
+    // Проверка падения с бревна
+    if (!isJumping && (distanceX > 25 || distanceY > 25) && currentLog.visible) {
+      hitAudioRef.current?.play();
+      setLives(prev => prev - 1);
+      setIsHit(true);
+      setTimeout(() => {
+        setIsHit(false);
+      }, 500);
+    }
 
-fishes.forEach((fish) => {
-  const fishDistanceX = Math.abs(fish.x - climberPosition.x);
-  const fishDistanceY = Math.abs(fish.y - climberPosition.y);
-  const isPlayerOnLog = logs[currentLogIndex] && Math.abs(climberPosition.y - logs[currentLogIndex].y) < 10;
-  const isVulnerable = !isPlayerOnLog && !isInvulnerable;
-  const isFishAbovePlayer = fish.y > climberPosition.y;
+    // Проверка столкновения с рыбками
+    fishes.forEach((fish) => {
+      const fishDistanceX = Math.abs(fish.x - climberPosition.x);
+      const fishDistanceY = Math.abs(fish.y - climberPosition.y);
+      const isPlayerOnLog = logs[currentLogIndex] && Math.abs(climberPosition.y - logs[currentLogIndex].y) < 10;
+      const isVulnerable = !isPlayerOnLog && !isInvulnerable;
+      const fishHeightThreshold = 150; // Уровень, выше которого рыбка не опасна
 
-  if (fishDistanceX <= 50 && fishDistanceY <= 50 && isVulnerable && !isHit && !isFishAbovePlayer) {
-    hitAudioRef.current?.play();
-    setLives(prev => {
-      const newLives = Math.max(0, prev - 1);
-      if (newLives <= 0) {
-        setStage(Stage.FINISH);
+      // Столкновение в воде (рыбка на уровне альпиниста)
+      if (
+        fishDistanceX <= 50 &&
+        fishDistanceY <= 50 &&
+        isVulnerable &&
+        !isHit &&
+        fish.y <= fishHeightThreshold // Рыбка ниже или на уровне порога
+      ) {
+        hitAudioRef.current?.play();
+        setLives(prev => {
+          const newLives = Math.max(0, prev - 1);
+          if (newLives <= 0) {
+            setStage(Stage.FINISH);
+          }
+          return newLives;
+        });
+        setIsHit(true);
+        setIsInvulnerable(true);
+        setTimeout(() => {
+          setIsHit(false);
+          setIsInvulnerable(false);
+        }, 2000);
       }
-      return newLives;
+
+      // Столкновение при прыжке на бревно с рыбкой
+      if (
+        isJumping &&
+        fishDistanceX <= 50 && // Рыбка близко по X
+        Math.abs(fish.y - currentLog.y) < 20 && // Рыбка на уровне бревна
+        fish.y <= fishHeightThreshold && // Рыбка не поднялась выше порога
+        !isHit &&
+        !isInvulnerable
+      ) {
+        hitAudioRef.current?.play();
+        setLives(prev => {
+          const newLives = Math.max(0, prev - 1);
+          if (newLives <= 0) {
+            setStage(Stage.FINISH);
+          }
+          return newLives;
+        });
+        setIsHit(true);
+        setIsInvulnerable(true);
+        setTimeout(() => {
+          setIsHit(false);
+          setIsInvulnerable(false);
+        }, 2000);
+      }
     });
-    setIsHit(true);
-    setIsInvulnerable(true);
-    setTimeout(() => {
-      setIsHit(false);
-      setIsInvulnerable(false);
-    }, 2000);
-  }
-});
   }, [stage, climberPosition, logs, currentLogIndex, fishes, isJumping, isHit, isInvulnerable, hitAudioRef]);
 
   const moveFishes = useCallback(() => {
     const currentTime = Date.now();
     setFishes(prev =>
       prev.map(fish => {
-        if (currentTime - fish.lastJumpTime >= fish.jumpInterval) {
-          return {
-            ...fish,
-            y: 150,
-            direction: "up",
-            lastJumpTime: currentTime,
-            jumpInterval: 2000 + Math.random() * 2000,
-          };
-        }
+        // Если у рыбки есть logIndex, значит она привязана к бревну
+        if ('logIndex' in fish) {
+          const log = logs[fish.logIndex];
+          if (!log) return fish; // Защита от ошибок
 
-    const jumpTime = currentTime - fish.lastJumpTime;
-    
-    if (jumpTime < fish.jumpInterval / 2) {
-      const newY = fish.direction === "up" ? fish.y + 4 : fish.y;
-      const newDirection = newY >= 250 ? "down" : fish.direction;
-      return { ...fish, y: newY, direction: newDirection };
-    } else {
-      const newY = fish.direction === "down" ? fish.y - 2 : fish.y;
-      const newDirection = newY <= 150 ? "up" : fish.direction;
-      return { ...fish, y: newY, direction: newDirection };
-    }
-  })
-);
-  }, []);
+          // Проверяем, нужно ли изменить состояние рыбки
+          let isSafeState = fish.isSafeState;
+          let lastStateChangeTime = fish.lastStateChangeTime || currentTime;
+          
+          if (fish.lastStateChangeTime) {
+            const timeInCurrentState = currentTime - fish.lastStateChangeTime;
+            
+            // Если рыбка в безопасном состоянии более 9 секунд, переводим в опасное
+            if (fish.isSafeState && timeInCurrentState > 9000) {
+              isSafeState = false;
+              lastStateChangeTime = currentTime;
+            } 
+            // Если рыбка в опасном состоянии более 3 секунд, переводим в безопасное
+            else if (!fish.isSafeState && timeInCurrentState > 3000) {
+              isSafeState = true;
+              lastStateChangeTime = currentTime;
+            }
+          }
+          
+          // Рыбка всегда остается на своем бревне, но меняет высоту в зависимости от состояния
+          const jumpTime = currentTime - fish.lastJumpTime;
+          
+          // В безопасном состоянии рыбка поднимается выше
+          const baseY = log.y + 25; // Базовая высота над бревном
+          const safetyOffset = isSafeState ? 40 : 0; // В безопасном состоянии рыбка поднимается выше
+          
+          // Амплитуда прыжков
+          const jumpAmplitude = 15;
+          
+          if (jumpTime < fish.jumpInterval / 2) {
+            // Фаза прыжка вверх
+            const newY = baseY + safetyOffset + Math.sin(jumpTime / (fish.jumpInterval / 2) * Math.PI) * jumpAmplitude;
+            return { 
+              ...fish, 
+              y: newY, 
+              direction: "up", 
+              isSafeState, 
+              lastStateChangeTime
+            };
+          } else {
+            // Фаза прыжка вниз
+            const newY = baseY + safetyOffset + Math.sin(jumpTime / (fish.jumpInterval / 2) * Math.PI) * jumpAmplitude;
+            return { 
+              ...fish, 
+              y: newY, 
+              direction: "down", 
+              isSafeState, 
+              lastStateChangeTime
+            };
+          }
+        } else {
+          // Для рыбок не на бревнах - старая логика
+          if (currentTime - fish.lastJumpTime >= fish.jumpInterval) {
+            return {
+              ...fish,
+              y: 150,
+              direction: "up",
+              lastJumpTime: currentTime,
+              jumpInterval: 2000 + Math.random() * 2000,
+            };
+          }
+
+          const jumpTime = currentTime - fish.lastJumpTime;
+          
+          if (jumpTime < fish.jumpInterval / 2) {
+            const newY = fish.direction === "up" ? fish.y + 4 : fish.y;
+            const newDirection = newY >= 250 ? "down" : fish.direction;
+            return { ...fish, y: newY, direction: newDirection };
+          } else {
+            const newY = fish.direction === "down" ? fish.y - 2 : fish.y;
+            const newDirection = newY <= 150 ? "up" : fish.direction;
+            return { ...fish, y: newY, direction: newDirection };
+          }
+        }
+      })
+    );
+  }, [logs]);
 
   const moveBoats = useCallback(() => {
     setBoats(prev => prev.map(boat => {
@@ -538,7 +664,6 @@ fishes.forEach((fish) => {
       if (stage !== Stage.GAME) return;
 
       if (event.key === "Escape") {
-        // Обработка паузы будет происходить в PauseContext
         return;
       }
 
@@ -549,17 +674,73 @@ fishes.forEach((fish) => {
           const nextLog = logs[currentLogIndex + 1];
           if (nextLog.visible) {
             setIsJumping(true);
-            
-            // Используем setTimeout вместо цепочки обещаний
+
             setTimeout(() => {
               setClimberPosition({ x: nextLog.x, y: nextLog.y });
               setCurrentLogIndex(prev => prev + 1);
               setScore(prev => prev + 10);
-              
+
+              // Проверяем, есть ли опасная рыбка на бревне, на которое мы прыгнули
+              const dangerousFishOnLog = fishes.find(
+                fish => 'logIndex' in fish && 
+                        fish.logIndex === currentLogIndex + 1 && 
+                        fish.isDangerous &&
+                        !fish.isSafeState // Проверяем, что рыбка в опасном состоянии
+              );
+
+              if (dangerousFishOnLog && !isInvulnerable) {
+                hitAudioRef.current?.play();
+                setLives(prev => {
+                  const newLives = Math.max(0, prev - 1);
+                  if (newLives <= 0) {
+                    setStage(Stage.FINISH);
+                  }
+                  return newLives;
+                });
+                setIsHit(true);
+                setIsInvulnerable(true);
+                setTimeout(() => {
+                  setIsHit(false);
+                  setIsInvulnerable(false);
+                }, 2000);
+              }
+
+              // Проверяем столкновение с прочими рыбками
+              fishes.forEach(fish => {
+                // Пропускаем рыбок, привязанных к бревнам - они проверяются отдельно выше
+                if ('logIndex' in fish) return;
+                
+                const fishDistanceX = Math.abs(fish.x - nextLog.x);
+                const fishDistanceY = Math.abs(fish.y - nextLog.y);
+                const fishHeightThreshold = 150;
+
+                if (
+                  fishDistanceX <= 50 &&
+                  fishDistanceY < 20 && // Рыбка на уровне бревна
+                  fish.y <= fishHeightThreshold && // Рыбка не выше порога
+                  !isInvulnerable
+                ) {
+                  hitAudioRef.current?.play();
+                  setLives(prev => {
+                    const newLives = Math.max(0, prev - 1);
+                    if (newLives <= 0) {
+                      setStage(Stage.FINISH);
+                    }
+                    return newLives;
+                  });
+                  setIsHit(true);
+                  setIsInvulnerable(true);
+                  setTimeout(() => {
+                    setIsHit(false);
+                    setIsInvulnerable(false);
+                  }, 2000);
+                }
+              });
+
               setTimeout(() => {
                 setIsJumping(false);
-              }, 600); // Длительность анимации прыжка
-            }, 300); // Задержка перед перемещением
+              }, 600);
+            }, 300);
           } else {
             hitAudioRef.current?.play();
             setLives(prev => {
@@ -570,10 +751,9 @@ fishes.forEach((fish) => {
               return newLives;
             });
             setIsHit(true);
-            
             setTimeout(() => {
               setIsHit(false);
-            }, 500); // Длительность анимации удара
+            }, 500);
           }
         }
       } else if (event.key === "ArrowLeft" || event.key === "a") {
@@ -581,16 +761,72 @@ fishes.forEach((fish) => {
           const prevLog = logs[currentLogIndex - 1];
           if (prevLog.visible) {
             setIsJumping(true);
-            
-            // Используем setTimeout вместо цепочки обещаний
+
             setTimeout(() => {
               setClimberPosition({ x: prevLog.x, y: prevLog.y });
               setCurrentLogIndex(prev => prev - 1);
-              
+
+              // Проверяем, есть ли опасная рыбка на бревне, на которое мы прыгнули
+              const dangerousFishOnLog = fishes.find(
+                fish => 'logIndex' in fish && 
+                        fish.logIndex === currentLogIndex - 1 && 
+                        fish.isDangerous &&
+                        !fish.isSafeState // Проверяем, что рыбка в опасном состоянии
+              );
+
+              if (dangerousFishOnLog && !isInvulnerable) {
+                hitAudioRef.current?.play();
+                setLives(prev => {
+                  const newLives = Math.max(0, prev - 1);
+                  if (newLives <= 0) {
+                    setStage(Stage.FINISH);
+                  }
+                  return newLives;
+                });
+                setIsHit(true);
+                setIsInvulnerable(true);
+                setTimeout(() => {
+                  setIsHit(false);
+                  setIsInvulnerable(false);
+                }, 2000);
+              }
+
+              // Проверяем столкновение с прочими рыбками
+              fishes.forEach(fish => {
+                // Пропускаем рыбок, привязанных к бревнам - они проверяются отдельно выше
+                if ('logIndex' in fish) return;
+                
+                const fishDistanceX = Math.abs(fish.x - prevLog.x);
+                const fishDistanceY = Math.abs(fish.y - prevLog.y);
+                const fishHeightThreshold = 150;
+
+                if (
+                  fishDistanceX <= 50 &&
+                  fishDistanceY < 20 && // Рыбка на уровне бревна
+                  fish.y <= fishHeightThreshold && // Рыбка не выше порога
+                  !isInvulnerable
+                ) {
+                  hitAudioRef.current?.play();
+                  setLives(prev => {
+                    const newLives = Math.max(0, prev - 1);
+                    if (newLives <= 0) {
+                      setStage(Stage.FINISH);
+                    }
+                    return newLives;
+                  });
+                  setIsHit(true);
+                  setIsInvulnerable(true);
+                  setTimeout(() => {
+                    setIsHit(false);
+                    setIsInvulnerable(false);
+                  }, 2000);
+                }
+              });
+
               setTimeout(() => {
                 setIsJumping(false);
-              }, 600); // Длительность анимации прыжка
-            }, 300); // Задержка перед перемещением
+              }, 600);
+            }, 300);
           } else {
             hitAudioRef.current?.play();
             setLives(prev => {
@@ -601,15 +837,14 @@ fishes.forEach((fish) => {
               return newLives;
             });
             setIsHit(true);
-            
             setTimeout(() => {
               setIsHit(false);
-            }, 500); // Длительность анимации удара
+            }, 500);
           }
         }
       }
     },
-    [stage, currentLogIndex, logs, isJumping, isHit, isPaused, hitAudioRef]
+    [stage, currentLogIndex, logs, isJumping, isHit, isPaused, fishes, isInvulnerable, hitAudioRef]
   );
 
   const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
@@ -631,64 +866,64 @@ fishes.forEach((fish) => {
   useEffect(() => {
     if (stage !== Stage.GAME || isPaused) return;
 
-const disappearingLogIndices = [2, 4, 6];
+    const disappearingLogIndices = [2, 4, 6];
 
-const logCycleInterval = setInterval(() => {
-  setLogs(prevLogs => {
-    const newLogs = [...prevLogs];
-    disappearingLogIndices.forEach(index => {
-      if (newLogs[index]) {
-        newLogs[index] = { ...newLogs[index], visible: !newLogs[index].visible };
-      }
-    });
+    const logCycleInterval = setInterval(() => {
+      setLogs(prevLogs => {
+        const newLogs = [...prevLogs];
+        disappearingLogIndices.forEach(index => {
+          if (newLogs[index]) {
+            newLogs[index] = { ...newLogs[index], visible: !newLogs[index].visible };
+          }
+        });
 
-    if (
-      disappearingLogIndices.includes(currentLogIndex) && 
-      !newLogs[currentLogIndex].visible && 
-      !isJumping
-    ) {
-      hitAudioRef.current?.play();
-      setLives(prev => {
-        const newLives = Math.max(0, prev - 1);
-        if (newLives <= 0) {
-          setStage(Stage.FINISH);
+        if (
+          disappearingLogIndices.includes(currentLogIndex) && 
+          !newLogs[currentLogIndex].visible && 
+          !isJumping
+        ) {
+          hitAudioRef.current?.play();
+          setLives(prev => {
+            const newLives = Math.max(0, prev - 1);
+            if (newLives <= 0) {
+              setStage(Stage.FINISH);
+            }
+            return newLives;
+          });
+          setIsHit(true);
+          setTimeout(() => {
+            const safeLogIndex = Math.max(0, currentLogIndex - 1);
+            setCurrentLogIndex(safeLogIndex);
+            setIsHit(false);
+          }, 500);
         }
-        return newLives;
+        
+        return newLogs;
       });
-      setIsHit(true);
-      setTimeout(() => {
-        const safeLogIndex = Math.max(0, currentLogIndex - 1);
-        setCurrentLogIndex(safeLogIndex);
-        setIsHit(false);
-      }, 500);
-    }
-    
-    return newLogs;
-  });
-}, 3000);
+    }, 3000);
 
-return () => clearInterval(logCycleInterval);
+    return () => clearInterval(logCycleInterval);
   }, [stage, isPaused, currentLogIndex, isJumping, hitAudioRef]);
 
   useEffect(() => {
     let timerInterval: NodeJS.Timeout | undefined;
 
-if (stage === Stage.GAME && time > 0 && !isPaused) {
-  timerInterval = setInterval(() => {
-    setTime(prev => prev - 1);
-  }, 1000);
-}
+    if (stage === Stage.GAME && time > 0 && !isPaused) {
+      timerInterval = setInterval(() => {
+        setTime(prev => prev - 1);
+      }, 1000);
+    }
 
-if (time === 0 || lives === 0) {
-  setStage(Stage.FINISH);
-  setTimeout(() => {
-    resetGame();
-  }, 3000);
-}
+    if (time === 0 || lives === 0) {
+      setStage(Stage.FINISH);
+      setTimeout(() => {
+        resetGame();
+      }, 3000);
+    }
 
-return () => {
-  if (timerInterval) clearInterval(timerInterval);
-};
+    return () => {
+      if (timerInterval) clearInterval(timerInterval);
+    };
   }, [stage, time, lives, resetGame, isPaused]);
 
   useEffect(() => {
@@ -714,10 +949,10 @@ return () => {
       audio.currentTime = 0;
     }
 
-return () => {
-  audio.pause();
-  audio.currentTime = 0;
-};
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
   }, [stage, audio, isPaused]);
 
   useEffect(() => {
@@ -729,11 +964,11 @@ return () => {
   useEffect(() => {
     if (stage !== Stage.GAME || isPaused || throwingTime <= 0) return;
 
-const bananaTimer = setInterval(() => {
-  setThrowingTime(prev => prev - 1);
-}, 1000);
+    const bananaTimer = setInterval(() => {
+      setThrowingTime(prev => prev - 1);
+    }, 1000);
 
-return () => clearInterval(bananaTimer);
+    return () => clearInterval(bananaTimer);
   }, [stage, isPaused, throwingTime]);
 
   useEffect(() => {
@@ -961,7 +1196,7 @@ return () => clearInterval(bananaTimer);
     
     @keyframes swimArms {
       0%, 100% { transform: rotate(15deg); }
-      50% { transform: rotate(30deg); }
+    50% { transform: rotate(30deg); }
     }
     
     .bear-paws::before {
@@ -1149,17 +1384,19 @@ return () => clearInterval(bananaTimer);
   }, [logs]);
 
   return (
-    <div className="boat-game-container">
+    <div className="boat-game-container" ref={gameContainerRef}>
       <style>{styles}</style>
       <audio ref={hitAudioRef} src={hitSound} preload="auto" />
       <audio ref={victoryAudioRef} src={victorySound} preload="auto" />
       <audio ref={coinAudioRef} src={coinSound} preload="auto" />
+      
       {stage === Stage.START && (
         <StartScreen
           onStart={handleStartClick}
           savedScores={savedScores}
         />
       )}
+      
       {stage === Stage.GAME && (
         <>
           <div 
@@ -1205,11 +1442,11 @@ return () => clearInterval(bananaTimer);
               }}
             >
               <div style={{ display: "flex", gap: "20px" }}>
-                <motion.div
+                <motion.div 
                   className="lives-container"
-                  style={{
+                  style={{ 
                     display: "flex",
-                    alignItems: "center", 
+                    alignItems: "center",
                     background: "rgba(0,0,0,0.5)",
                     padding: "10px",
                     borderRadius: "10px",
@@ -1345,7 +1582,7 @@ return () => clearInterval(bananaTimer);
                   style={{
                     left: `${coin.x}px`,
                     top: `${coin.y}px`,
-                    position: 'absolute', // Убеждаемся, что позиционирование абсолютное
+                    position: 'absolute',
                   }}
                   variants={coinVariants}
                   initial="initial"
@@ -1359,7 +1596,7 @@ return () => clearInterval(bananaTimer);
             {lastLog ? (
               <motion.div 
                 className="bear"
-                style={{
+                style={{ 
                   left: `${lastLog.x}px`,
                   bottom: `${lastLog.y + 50}px`,
                   zIndex: 10
@@ -1382,7 +1619,7 @@ return () => clearInterval(bananaTimer);
                 <div className="bear-paws" />
               </motion.div>
             ) : (
-              <div
+              <div 
                 style={{
                   position: "absolute",
                   left: "50%",
@@ -1404,22 +1641,50 @@ return () => clearInterval(bananaTimer);
                 className="fish"
                 style={{
                   left: `${fish.x}px`,
-                  bottom: `${fish.y}px`
+                  bottom: `${fish.y}px`,
+                  backgroundColor: fish.y > 150 ? '#00ff00' : 
+                                 'logIndex' in fish ? 
+                                    fish.isSafeState ? '#00BFFF' : '#FF0000' : 
+                                    fish.isDangerous ? '#ff6600' : '#2196F3',
+                  width: 'logIndex' in fish ? '30px' : '20px',
+                  height: 'logIndex' in fish ? '30px' : '20px',
+                  boxShadow: 'logIndex' in fish ? 
+                             fish.isSafeState ? 
+                               '0 0 10px #00BFFF, 0 0 20px #00BFFF' : // Голубое свечение для безопасных
+                               '0 0 10px red, 0 0 20px red' :        // Красное свечение для опасных
+                             'none',
+                  borderRadius: '50%',
+                  zIndex: 'logIndex' in fish ? 4 : 2,
+                  transition: 'background-color 0.5s, box-shadow 0.5s, transform 0.5s',
                 }}
+                animate={
+                  'logIndex' in fish ? {
+                    scale: fish.isSafeState ? 
+                            [1, 1.1, 1] :      // Мягкая пульсация для безопасной рыбки
+                            [1, 1.3, 1],        // Более активная пульсация для опасной рыбки
+                    y: fish.isSafeState ? [0, -5, 0] : [0, -8, 0], // Разная амплитуда движения
+                    transition: {
+                      repeat: Infinity,
+                      duration: fish.isSafeState ? 2 : 1, // Разная скорость анимации
+                      ease: "easeInOut"
+                    }
+                  } : {}
+                }
               />
             ))}
 
             {/* Летающие рыбки в небе */}
             {decorativeFishes.map(fish => (
-              <motion.div
+              <motion.div 
                 key={`decorative-fish-${fish.id}`}
                 className={`fish ${fish.direction === "left" ? "swimming-left" : ""}`}
                 style={{
                   left: `${fish.x}px`,
                   top: `${fish.y}px`,
                   transform: `scale(${fish.size}) ${fish.direction === "left" ? "scaleX(-1)" : ""}`,
-                  zIndex: 4, // За бревнами, но перед фоном
-                  filter: `hue-rotate(${fish.id * 30}deg) brightness(${1 + fish.id % 3 * 0.1})` // Добавляем разнообразие цветов
+                  zIndex: 4,
+                  filter: `hue-rotate(${fish.id * 30}deg) brightness(${1 + fish.id % 3 * 0.1})`,
+                  backgroundColor: fish.isDangerous && fish.y < 150 ? '#ff6666' : undefined // Красноватый цвет для опасных рыбок ниже порога
                 }}
                 animate={{
                   y: [fish.y - 15, fish.y + 15],
@@ -1439,21 +1704,20 @@ return () => clearInterval(bananaTimer);
                     }
                   }
                 }}
-                whileHover={{ scale: fish.size * 1.2, y: fish.y - 10 }} // Больше реакция при наведении, как будто птица взлетает выше
+                whileHover={{ scale: fish.size * 1.2, y: fish.y - 10 }}
               >
-                {/* Добавляем внутренние элементы "летающей рыбки" */}
                 <div 
                   className="fish-fin-top" 
-                  style={{ 
+                  style={{
                     background: `linear-gradient(to top, ${fish.color}, transparent)`,
-                    transform: `rotate(${Math.sin(Date.now() / 500 + fish.id) * 20}deg)` // Более быстрое и выраженное движение крыльев
+                    transform: `rotate(${Math.sin(Date.now() / 500 + fish.id) * 20}deg)`
                   }} 
                 />
                 <div 
                   className="fish-fin-bottom" 
-                  style={{ 
+                  style={{
                     background: `linear-gradient(to bottom, ${fish.color}, transparent)`,
-                    transform: `rotate(${Math.cos(Date.now() / 500 + fish.id) * 20}deg)` // Более быстрое и выраженное движение крыльев
+                    transform: `rotate(${Math.cos(Date.now() / 500 + fish.id) * 20}deg)`
                   }} 
                 />
                 <div className="fish-eye" />
@@ -1467,6 +1731,7 @@ return () => clearInterval(bananaTimer);
           </div>
         </>
       )}
+      
       {stage === Stage.FINISH && (
         <EndScreen
           onRestart={resetGame}
